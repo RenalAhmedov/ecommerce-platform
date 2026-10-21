@@ -7,4 +7,6 @@ export interface EnvironmentVariables {
   DB_USERNAME: string;
   DB_PASSWORD: string;
   DB_LOGGING: boolean;
+  JWT_SECRET: string;
+  JWT_EXPIRES_IN: number;
 }

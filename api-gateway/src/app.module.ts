@@ -7,6 +7,7 @@ import {
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_FILTER, APP_PIPE } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AuthModule } from './auth/auth.module.js';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware.js';
 import { validateEnv } from './config/env.validation.js';
@@ -33,6 +34,7 @@ import { createDataSourceOptions } from './database/database.config.js';
         autoLoadEntities: true,
       }),
     }),
+    AuthModule,
   ],
   providers: [
     {
