@@ -16,4 +16,4 @@ dist/
 vendor/
 
 # Logs
-*.log
+*.log*.tsbuildinfo
