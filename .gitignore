@@ -13,7 +13,8 @@
 # Dependencies / builds
 node_modules/
 dist/
+*.tsbuildinfo
 vendor/
 
 # Logs
-*.log
+*.log*.tsbuildinfo
