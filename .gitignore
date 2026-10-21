@@ -1,0 +1,19 @@
+# OS / editor
+.DS_Store
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+
+# Environment files (never commit secrets)
+.env
+.env.*
+!.env.example
+
+# Dependencies / builds
+node_modules/
+dist/
+vendor/
+
+# Logs
+*.log
