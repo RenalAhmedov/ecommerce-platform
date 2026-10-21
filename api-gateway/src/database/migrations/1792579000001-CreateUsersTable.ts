@@ -17,7 +17,8 @@ export class CreateUsersTable1792579000001 implements MigrationInterface {
         CONSTRAINT users_pkey PRIMARY KEY (id),
         CONSTRAINT users_role_check CHECK (role IN ('customer', 'admin'))
       )
-    `);  }
+    `);
+  }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`DROP TABLE users`);

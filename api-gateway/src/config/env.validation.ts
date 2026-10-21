@@ -1,6 +1,7 @@
 import Joi from 'joi';
+import type { EnvironmentVariables } from './interfaces/environment-variables.interface.js';
 
-export const envValidationSchema = Joi.object({
+const envValidationSchema = Joi.object<EnvironmentVariables>({
   NODE_ENV: Joi.string()
     .valid('development', 'production', 'test')
     .default('development'),
@@ -13,3 +14,18 @@ export const envValidationSchema = Joi.object({
   DB_PASSWORD: Joi.string().required(),
   DB_LOGGING: Joi.boolean().default(false),
 });
+
+export function validateEnv(
+  config: Record<string, unknown>,
+): EnvironmentVariables {
+  const { error, value } = envValidationSchema.validate(config, {
+    allowUnknown: true,
+    abortEarly: false,
+  });
+
+  if (error) {
+    throw new Error(`Config validation error: ${error.message}`);
+  }
+
+  return value;
+}

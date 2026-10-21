@@ -23,7 +23,8 @@ export class CreateOrdersTable1792579000005 implements MigrationInterface {
         CONSTRAINT orders_subtotal_check CHECK (subtotal >= 0),
         CONSTRAINT orders_total_check CHECK (total >= 0)
       )
-    `);  }
+    `);
+  }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`DROP TABLE orders`);

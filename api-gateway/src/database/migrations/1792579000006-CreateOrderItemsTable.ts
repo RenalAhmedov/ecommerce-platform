@@ -23,7 +23,8 @@ export class CreateOrderItemsTable1792579000006 implements MigrationInterface {
         CONSTRAINT order_items_quantity_check CHECK (quantity > 0),
         CONSTRAINT order_items_line_total_check CHECK (line_total >= 0)
       )
-    `);  }
+    `);
+  }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`DROP TABLE order_items`);

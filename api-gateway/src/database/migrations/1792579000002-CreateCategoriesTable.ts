@@ -17,7 +17,8 @@ export class CreateCategoriesTable1792579000002 implements MigrationInterface {
           REFERENCES categories (id) ON DELETE SET NULL,
         CONSTRAINT categories_parent_check CHECK (parent_id IS NULL OR parent_id <> id)
       )
-    `);  }
+    `);
+  }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`DROP TABLE categories`);

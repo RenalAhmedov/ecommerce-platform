@@ -21,7 +21,8 @@ export class CreateProductsTable1792579000003 implements MigrationInterface {
           REFERENCES categories (id) ON DELETE SET NULL,
         CONSTRAINT products_price_check CHECK (price >= 0)
       )
-    `);  }
+    `);
+  }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`DROP TABLE products`);

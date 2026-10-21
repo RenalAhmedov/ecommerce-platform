@@ -22,7 +22,8 @@ export class CreateInventoryMovementsTable1792579000007 implements MigrationInte
         CONSTRAINT inventory_movements_change_check CHECK (change <> 0),
         CONSTRAINT inventory_movements_reason_check CHECK (reason IN ('initial', 'restock', 'sale', 'cancellation', 'adjustment'))
       )
-    `);  }
+    `);
+  }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`DROP TABLE inventory_movements`);
