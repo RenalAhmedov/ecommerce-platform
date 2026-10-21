@@ -14,6 +14,8 @@ npm install
 npm run migration:run
 ```
 
+`JWT_SECRET` in `.env` must be set to a random string of at least 32 characters, e.g. the output of `openssl rand -hex 32`. The app refuses to start without it.
+
 ## Run
 
 ```bash

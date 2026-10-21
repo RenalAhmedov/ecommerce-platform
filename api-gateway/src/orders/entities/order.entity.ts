@@ -8,6 +8,7 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
   type Relation,
+  Unique,
   UpdateDateColumn,
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity.js';
@@ -15,6 +16,7 @@ import { OrderStatus } from '../enums/order-status.enum.js';
 import { OrderItem } from './order-item.entity.js';
 
 @Entity('orders')
+@Unique('orders_order_number_unique', ['orderNumber'])
 @Check(
   'orders_status_check',
   `status IN ('pending', 'paid', 'processing', 'shipped', 'delivered', 'cancelled', 'payment_failed')`,
@@ -28,7 +30,7 @@ export class Order {
   })
   id: number;
 
-  @Column({ name: 'order_number', type: 'varchar', length: 32, unique: true })
+  @Column({ name: 'order_number', type: 'varchar', length: 32 })
   orderNumber: string;
 
   @Column({ name: 'user_id', type: 'bigint' })
