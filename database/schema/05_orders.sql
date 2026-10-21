@@ -13,7 +13,3 @@ CREATE TABLE orders (
     created_at        TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
     updated_at        TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
-
-CREATE INDEX orders_user_id_index ON orders (user_id);
-CREATE INDEX orders_status_created_at_index ON orders (status, created_at);
-CREATE INDEX orders_created_at_index ON orders (created_at);

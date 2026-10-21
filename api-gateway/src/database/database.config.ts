@@ -11,6 +11,7 @@ export function createDataSourceOptions(): DataSourceOptions {
     password: process.env.DB_PASSWORD,
     entities: [join(import.meta.dirname, '..', '**', '*.entity.js')],
     migrations: [join(import.meta.dirname, 'migrations', '*.js')],
+    parseInt8: true,
     synchronize: false,
     logging: process.env.DB_LOGGING === 'true',
   };

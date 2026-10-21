@@ -11,6 +11,3 @@ CREATE TABLE users (
     updated_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     deleted_at        TIMESTAMPTZ
 );
-
-CREATE UNIQUE INDEX users_email_unique ON users (LOWER(email)) WHERE deleted_at IS NULL;
-CREATE INDEX users_role_index ON users (role);

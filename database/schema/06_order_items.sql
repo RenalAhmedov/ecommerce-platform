@@ -10,5 +10,3 @@ CREATE TABLE order_items (
     updated_at   TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
     UNIQUE (order_id, product_id)
 );
-
-CREATE INDEX order_items_product_id_index ON order_items (product_id);

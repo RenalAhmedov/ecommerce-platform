@@ -12,8 +12,3 @@ CREATE TABLE products (
     updated_at  TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
     deleted_at  TIMESTAMPTZ
 );
-
-CREATE UNIQUE INDEX products_slug_unique ON products (slug) WHERE deleted_at IS NULL;
-CREATE UNIQUE INDEX products_sku_unique  ON products (sku)  WHERE deleted_at IS NULL;
-CREATE INDEX products_category_id_index ON products (category_id);
-CREATE INDEX products_active_price_index ON products (is_active, price) WHERE deleted_at IS NULL;

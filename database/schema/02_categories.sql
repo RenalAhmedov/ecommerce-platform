@@ -9,6 +9,3 @@ CREATE TABLE categories (
     deleted_at  TIMESTAMPTZ,
     CHECK (parent_id IS NULL OR parent_id <> id)
 );
-
-CREATE UNIQUE INDEX categories_slug_unique ON categories (slug) WHERE deleted_at IS NULL;
-CREATE INDEX categories_parent_id_index ON categories (parent_id);

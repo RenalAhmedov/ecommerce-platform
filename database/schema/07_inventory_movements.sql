@@ -9,7 +9,3 @@ CREATE TABLE inventory_movements (
     note       VARCHAR(255),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
-CREATE INDEX inventory_movements_product_id_created_at_index
-    ON inventory_movements (product_id, created_at);
-CREATE INDEX inventory_movements_order_id_index ON inventory_movements (order_id);
