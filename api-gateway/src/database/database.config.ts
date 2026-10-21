@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import type { DataSourceOptions } from 'typeorm';
 import type { EnvironmentVariables } from '../config/interfaces/environment-variables.interface.js';
 
-export type DatabaseEnv = Pick<
+type DatabaseEnv = Pick<
   EnvironmentVariables,
   | 'DB_HOST'
   | 'DB_PORT'

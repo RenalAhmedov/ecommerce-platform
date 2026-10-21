@@ -22,8 +22,8 @@ import { createDataSourceOptions } from './database/database.config.js';
     }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService<EnvironmentVariables, true>) => ({
-        ...createDataSourceOptions({
+      useFactory: (config: ConfigService<EnvironmentVariables, true>) =>
+        createDataSourceOptions({
           DB_HOST: config.get('DB_HOST'),
           DB_PORT: config.get('DB_PORT'),
           DB_DATABASE: config.get('DB_DATABASE'),
@@ -31,8 +31,6 @@ import { createDataSourceOptions } from './database/database.config.js';
           DB_PASSWORD: config.get('DB_PASSWORD'),
           DB_LOGGING: config.get('DB_LOGGING'),
         }),
-        autoLoadEntities: true,
-      }),
     }),
     AuthModule,
   ],

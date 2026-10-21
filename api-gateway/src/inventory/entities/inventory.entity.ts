@@ -7,11 +7,13 @@ import {
   OneToOne,
   PrimaryGeneratedColumn,
   type Relation,
+  Unique,
   UpdateDateColumn,
 } from 'typeorm';
 import { Product } from '../../products/entities/product.entity.js';
 
 @Entity('inventories')
+@Unique('inventories_product_id_unique', ['productId'])
 @Check('inventories_quantity_check', 'quantity >= 0')
 @Check('inventories_low_stock_threshold_check', 'low_stock_threshold >= 0')
 export class Inventory {
@@ -21,7 +23,7 @@ export class Inventory {
   })
   id: number;
 
-  @Column({ name: 'product_id', type: 'bigint', unique: true })
+  @Column({ name: 'product_id', type: 'bigint' })
   productId: number;
 
   @Column({ type: 'integer', default: 0 })
