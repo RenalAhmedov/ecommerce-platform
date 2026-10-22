@@ -2,7 +2,7 @@ import { Test } from '@nestjs/testing';
 import { PaymentGateway } from '../../../payments/payment.gateway.js';
 import { OrderStatus } from '../../enums/order-status.enum.js';
 import { OrdersRepository } from '../../orders.repository.js';
-import { OrderEmailsProducer } from '../../queues/order-emails.producer.js';
+import { OrderEventsPublisher } from '../../events/order-events.publisher.js';
 import { OrderPaymentService } from '../../services/order-payment.service.js';
 import { OrderReleaseService } from '../../services/order-release.service.js';
 import type { PlacedOrder } from '../../types/order.types.js';
@@ -15,7 +15,7 @@ describe('OrderPaymentService', () => {
   };
   let ordersRepository: { transaction: ReturnType<typeof vi.fn> };
   let gateway: { charge: ReturnType<typeof vi.fn> };
-  let emails: { queueConfirmation: ReturnType<typeof vi.fn> };
+  let events: { publishPaid: ReturnType<typeof vi.fn> };
   let release: { releasePending: ReturnType<typeof vi.fn> };
 
   const order: PlacedOrder = {
@@ -41,7 +41,7 @@ describe('OrderPaymentService', () => {
         .fn()
         .mockResolvedValue({ status: 'succeeded', transactionId: 'mock_1' }),
     };
-    emails = { queueConfirmation: vi.fn() };
+    events = { publishPaid: vi.fn() };
     release = { releasePending: vi.fn().mockResolvedValue(true) };
 
     const moduleRef = await Test.createTestingModule({
@@ -49,7 +49,7 @@ describe('OrderPaymentService', () => {
         OrderPaymentService,
         { provide: OrdersRepository, useValue: ordersRepository },
         { provide: PaymentGateway, useValue: gateway },
-        { provide: OrderEmailsProducer, useValue: emails },
+        { provide: OrderEventsPublisher, useValue: events },
         { provide: OrderReleaseService, useValue: release },
       ],
     }).compile();
@@ -67,15 +67,21 @@ describe('OrderPaymentService', () => {
     });
   });
 
-  it('marks a successful payment as paid and queues the confirmation email', async () => {
+  it('marks a successful payment as paid and publishes order.paid', async () => {
     await expect(service.settle(order, 'tok_visa')).resolves.toBe(true);
 
     expect(transactionOrders.markPaid).toHaveBeenCalledWith(10, 'mock_1');
-    expect(emails.queueConfirmation).toHaveBeenCalledWith(10);
+    expect(events.publishPaid).toHaveBeenCalledWith({
+      orderId: 10,
+      orderNumber: 'ORD-1',
+      userId: 9,
+      total: '45.00',
+      paymentReference: 'mock_1',
+    });
     expect(release.releasePending).not.toHaveBeenCalled();
   });
 
-  it('does not touch an order that is no longer pending, and sends no email', async () => {
+  it('does not touch an order that is no longer pending, and publishes nothing', async () => {
     transactionOrders.lockStatusById.mockResolvedValue(
       OrderStatus.PaymentFailed,
     );
@@ -83,7 +89,7 @@ describe('OrderPaymentService', () => {
     await expect(service.settle(order, 'tok_visa')).resolves.toBe(true);
 
     expect(transactionOrders.markPaid).not.toHaveBeenCalled();
-    expect(emails.queueConfirmation).not.toHaveBeenCalled();
+    expect(events.publishPaid).not.toHaveBeenCalled();
   });
 
   it('releases the order when the payment is declined', async () => {
@@ -96,7 +102,7 @@ describe('OrderPaymentService', () => {
 
     expect(release.releasePending).toHaveBeenCalledWith(order);
     expect(transactionOrders.markPaid).not.toHaveBeenCalled();
-    expect(emails.queueConfirmation).not.toHaveBeenCalled();
+    expect(events.publishPaid).not.toHaveBeenCalled();
   });
 
   it('treats a gateway error as a decline', async () => {

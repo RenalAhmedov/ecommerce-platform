@@ -2,8 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import type { ChargeResult } from '../../payments/interfaces/charge.interface.js';
 import { PaymentGateway } from '../../payments/payment.gateway.js';
 import { OrderStatus } from '../enums/order-status.enum.js';
+import { OrderEventsPublisher } from '../events/order-events.publisher.js';
 import { OrdersRepository } from '../orders.repository.js';
-import { OrderEmailsProducer } from '../queues/order-emails.producer.js';
 import type { PlacedOrder } from '../types/order.types.js';
 import { OrderReleaseService } from './order-release.service.js';
 
@@ -14,7 +14,7 @@ export class OrderPaymentService {
   constructor(
     private readonly ordersRepository: OrdersRepository,
     private readonly paymentGateway: PaymentGateway,
-    private readonly orderEmailsProducer: OrderEmailsProducer,
+    private readonly orderEventsPublisher: OrderEventsPublisher,
     private readonly orderReleaseService: OrderReleaseService,
   ) {}
 
@@ -23,7 +23,13 @@ export class OrderPaymentService {
 
     if (result.status === 'succeeded') {
       if (await this.markPaid(order, result.transactionId)) {
-        await this.orderEmailsProducer.queueConfirmation(order.id);
+        await this.orderEventsPublisher.publishPaid({
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          userId: order.userId,
+          total: order.total,
+          paymentReference: result.transactionId,
+        });
       }
       return true;
     }

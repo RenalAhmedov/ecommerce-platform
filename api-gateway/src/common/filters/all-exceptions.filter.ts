@@ -17,6 +17,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
   constructor(private readonly httpAdapterHost: HttpAdapterHost) {}
 
   catch(exception: unknown, host: ArgumentsHost): void {
+    if (host.getType() !== 'http') {
+      this.logger.error(
+        `Unhandled ${host.getType()} error`,
+        exception instanceof Error ? exception.stack : String(exception),
+      );
+      return;
+    }
+
     const { httpAdapter } = this.httpAdapterHost;
     const ctx = host.switchToHttp();
     const request: unknown = ctx.getRequest();
