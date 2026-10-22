@@ -8,6 +8,7 @@ import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 import { RolesGuard } from './guards/roles.guard.js';
+import { RevokedTokenStore } from './revoked-token.store.js';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { RolesGuard } from './guards/roles.guard.js';
   controllers: [AuthController],
   providers: [
     AuthService,
+    RevokedTokenStore,
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,

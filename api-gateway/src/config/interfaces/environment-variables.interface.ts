@@ -16,4 +16,6 @@ export interface EnvironmentVariables {
   MAIL_HOST: string;
   MAIL_PORT: number;
   MAIL_FROM: string;
+  RATE_LIMIT_ENABLED: boolean;
+  CORS_ORIGINS: string;
 }

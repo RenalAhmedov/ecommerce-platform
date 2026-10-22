@@ -18,6 +18,7 @@ import { createDataSourceOptions } from './database/database.config.js';
 import { createQueueConnectionOptions } from './messaging/queue-connection.options.js';
 import { OrdersModule } from './orders/orders.module.js';
 import { ProductsModule } from './products/products.module.js';
+import { RateLimitModule } from './rate-limit/rate-limit.module.js';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { ProductsModule } from './products/products.module.js';
     }),
     CacheModule,
     AuthModule,
+    RateLimitModule,
     ProductsModule,
     OrdersModule,
   ],

@@ -1,4 +1,5 @@
 import type { Product } from '../entities/product.entity.js';
+import type { ProductCategoryDto } from './product-category.dto.js';
 
 export class ProductResponseDto {
   id: number;
@@ -9,7 +10,7 @@ export class ProductResponseDto {
   price: string;
   imagePath: string | null;
   isActive: boolean;
-  category: { id: number; name: string } | null;
+  category: ProductCategoryDto | null;
   stock: number;
   createdAt: Date;
   updatedAt: Date;

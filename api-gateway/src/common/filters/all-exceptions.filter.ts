@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
 import { STATUS_CODES } from 'node:http';
-import type { ErrorResponse } from '../interfaces/error-response.interface.js';
+import type { ErrorResponseDto } from '../dto/error-response.dto.js';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -29,7 +29,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const request: unknown = ctx.getRequest();
 
-    const body: ErrorResponse = {
+    const body: ErrorResponseDto = {
       ...this.toStatusAndMessage(exception),
       path: httpAdapter.getRequestUrl(request) as string,
       timestamp: new Date().toISOString(),
@@ -47,7 +47,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
   private toStatusAndMessage(
     exception: unknown,
-  ): Pick<ErrorResponse, 'statusCode' | 'error' | 'message'> {
+  ): Pick<ErrorResponseDto, 'statusCode' | 'error' | 'message'> {
     if (isClientHttpError(exception)) {
       return {
         statusCode: exception.status,

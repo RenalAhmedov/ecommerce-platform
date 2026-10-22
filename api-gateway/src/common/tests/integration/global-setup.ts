@@ -40,6 +40,7 @@ export default async function setup(
     REDIS_HOST: redis.getHost(),
     REDIS_PORT: String(redis.getPort()),
     REDIS_DB: '0',
+    RATE_LIMIT_ENABLED: 'false',
     JWT_SECRET: 'integration-tests-only-secret-0123456789abcdef',
   };
 

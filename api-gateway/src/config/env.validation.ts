@@ -25,6 +25,9 @@ const envValidationSchema = Joi.object<EnvironmentVariables>({
   MAIL_HOST: Joi.string().default('localhost'),
   MAIL_PORT: Joi.number().port().default(1025),
   MAIL_FROM: Joi.string().default('Shop <no-reply@shop.local>'),
+
+  RATE_LIMIT_ENABLED: Joi.boolean().default(true),
+  CORS_ORIGINS: Joi.string().allow('').default(''),
 });
 
 export function validateEnv(

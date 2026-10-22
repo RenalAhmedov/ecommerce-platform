@@ -1,4 +1,7 @@
-import { UnauthorizedException } from '@nestjs/common';
+import {
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
@@ -7,6 +10,7 @@ import type { User } from '../../users/entities/user.entity.js';
 import { UserRole } from '../../users/enums/user-role.enum.js';
 import { UsersService } from '../../users/users.service.js';
 import { AuthService } from '../auth.service.js';
+import { RevokedTokenStore } from '../revoked-token.store.js';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -16,6 +20,7 @@ describe('AuthService', () => {
     getById: ReturnType<typeof vi.fn>;
   };
   let jwtService: { signAsync: ReturnType<typeof vi.fn> };
+  let revokedTokenStore: { revoke: ReturnType<typeof vi.fn> };
   let storedUser: User;
 
   beforeAll(async () => {
@@ -38,12 +43,14 @@ describe('AuthService', () => {
       getById: vi.fn().mockResolvedValue(storedUser),
     };
     jwtService = { signAsync: vi.fn().mockResolvedValue('signed.jwt.token') };
+    revokedTokenStore = { revoke: vi.fn() };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         AuthService,
         { provide: UsersService, useValue: usersService },
         { provide: JwtService, useValue: jwtService },
+        { provide: RevokedTokenStore, useValue: revokedTokenStore },
         { provide: ConfigService, useValue: { get: () => 3600 } },
       ],
     }).compile();
@@ -89,17 +96,26 @@ describe('AuthService', () => {
   });
 
   describe('login', () => {
-    it('signs a token with the user id, email and role', async () => {
-      await service.login({
+    it('signs a token with the user id, email, role and a unique token id', async () => {
+      const credentials = {
         email: 'ada@example.test',
         password: 'password123',
-      });
+      };
 
-      expect(jwtService.signAsync).toHaveBeenCalledWith({
+      await service.login(credentials);
+      await service.login(credentials);
+
+      const [[first], [second]] = jwtService.signAsync.mock.calls as [
+        [{ jti: string }],
+        [{ jti: string }],
+      ];
+      expect(first).toEqual({
         sub: 7,
         email: 'ada@example.test',
         role: UserRole.Customer,
+        jti: expect.stringMatching(/^[0-9a-f-]{36}$/),
       });
+      expect(first.jti).not.toBe(second.jti);
     });
 
     it('rejects a wrong password', async () => {
@@ -117,6 +133,34 @@ describe('AuthService', () => {
         service.login({ email: 'nobody@example.test', password: 'x' }),
       ).rejects.toThrow(new UnauthorizedException('Invalid credentials'));
       expect(compare).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('logout', () => {
+    const claims = {
+      sub: 7,
+      email: 'ada@example.test',
+      role: UserRole.Customer,
+      jti: 'token-1',
+      iat: 1_700_000_000,
+      exp: 1_700_003_600,
+    };
+
+    it('revokes the token id until the token expires', async () => {
+      await service.logout(claims);
+
+      expect(revokedTokenStore.revoke).toHaveBeenCalledWith(
+        'token-1',
+        1_700_003_600,
+      );
+    });
+
+    it('answers 503 instead of pretending to log out when Redis is down', async () => {
+      revokedTokenStore.revoke.mockRejectedValue(new Error('ECONNREFUSED'));
+
+      await expect(service.logout(claims)).rejects.toThrow(
+        ServiceUnavailableException,
+      );
     });
   });
 

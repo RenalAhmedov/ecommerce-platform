@@ -3,12 +3,14 @@ import type { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { UserRole } from '../../../users/enums/user-role.enum.js';
 import { JwtAuthGuard } from '../../guards/jwt-auth.guard.js';
+import type { RevokedTokenStore } from '../../revoked-token.store.js';
 
 describe('JwtAuthGuard', () => {
   const jwtService = new JwtService({
     secret: 'unit-test-secret-0123456789abcdefghij',
   });
   let reflector: { getAllAndOverride: ReturnType<typeof vi.fn> };
+  let revokedTokenStore: { isRevoked: ReturnType<typeof vi.fn> };
   let guard: JwtAuthGuard;
   let request: { headers: Record<string, string>; user?: unknown };
 
@@ -20,11 +22,24 @@ describe('JwtAuthGuard', () => {
       switchToHttp: () => ({ getRequest: () => request }),
     }) as unknown as ExecutionContext;
 
-  const payload = { sub: 7, email: 'ada@example.test', role: UserRole.Admin };
+  const payload = {
+    sub: 7,
+    email: 'ada@example.test',
+    role: UserRole.Admin,
+    jti: 'token-1',
+  };
+  const authorize = async (claims: object = payload, scheme = 'Bearer') => {
+    request.headers.authorization = `${scheme} ${await jwtService.signAsync(claims)}`;
+  };
 
   beforeEach(() => {
     reflector = { getAllAndOverride: vi.fn().mockReturnValue(false) };
-    guard = new JwtAuthGuard(jwtService, reflector as unknown as Reflector);
+    revokedTokenStore = { isRevoked: vi.fn().mockResolvedValue(false) };
+    guard = new JwtAuthGuard(
+      jwtService,
+      reflector as unknown as Reflector,
+      revokedTokenStore as unknown as RevokedTokenStore,
+    );
     request = { headers: {} };
   });
 
@@ -63,13 +78,35 @@ describe('JwtAuthGuard', () => {
     );
   });
 
+  it('rejects a token without a token id, which could never be revoked', async () => {
+    await authorize({ sub: 7, email: 'ada@example.test', role: 'admin' });
+
+    await expect(guard.canActivate(context())).rejects.toThrow(
+      new UnauthorizedException('Invalid or expired access token'),
+    );
+  });
+
+  it('rejects a revoked token', async () => {
+    await authorize();
+    revokedTokenStore.isRevoked.mockResolvedValue(true);
+
+    await expect(guard.canActivate(context())).rejects.toThrow(
+      new UnauthorizedException('Access token has been revoked'),
+    );
+    expect(revokedTokenStore.isRevoked).toHaveBeenCalledWith('token-1');
+    expect(request.user).toBeUndefined();
+  });
+
   it.each(['Bearer', 'bearer'])(
-    'accepts a valid token with the "%s" scheme and attaches the user',
+    'accepts a valid token with the "%s" scheme and attaches the claims',
     async (scheme) => {
-      request.headers.authorization = `${scheme} ${await jwtService.signAsync(payload)}`;
+      await authorize(payload, scheme);
 
       await expect(guard.canActivate(context())).resolves.toBe(true);
-      expect(request.user).toMatchObject(payload);
+      expect(request.user).toMatchObject({
+        ...payload,
+        iat: expect.any(Number),
+      });
     },
   );
 });

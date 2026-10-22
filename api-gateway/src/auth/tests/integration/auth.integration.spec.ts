@@ -96,4 +96,44 @@ describe('Auth (integration)', () => {
     expect(login.status).toBe(401);
     expect(registerAgain.status).toBe(409);
   });
+
+  it('revokes only the logged-out token, until it would have expired', async () => {
+    const { token: phone } = await testApp.signUp('ada@example.test');
+    const { body: laptop } = await testApp.request<{ accessToken: string }>(
+      'POST',
+      '/auth/login',
+      { body: { email: 'ada@example.test', password: 'password123' } },
+    );
+
+    const logout = await testApp.request('POST', '/auth/logout', {
+      token: phone,
+    });
+    const phoneAfter = await testApp.request('GET', '/auth/me', {
+      token: phone,
+    });
+    const laptopAfter = await testApp.request('GET', '/auth/me', {
+      token: laptop.accessToken,
+    });
+    const revokedKeys = await testApp.redis.keys('auth:revoked-token:*');
+    const ttl = await testApp.redis.ttl(revokedKeys[0]);
+
+    expect(logout.status).toBe(204);
+    expect(phoneAfter.status).toBe(401);
+    expect(phoneAfter.body).toMatchObject({
+      message: 'Access token has been revoked',
+    });
+    expect(laptopAfter.status).toBe(200);
+    expect(revokedKeys).toHaveLength(1);
+    expect(ttl).toBeGreaterThan(3_500);
+    expect(ttl).toBeLessThanOrEqual(3_600);
+  });
+
+  it('cannot log out twice with the same token', async () => {
+    const { token } = await testApp.signUp('ada@example.test');
+
+    await testApp.request('POST', '/auth/logout', { token });
+    const again = await testApp.request('POST', '/auth/logout', { token });
+
+    expect(again.status).toBe(401);
+  });
 });

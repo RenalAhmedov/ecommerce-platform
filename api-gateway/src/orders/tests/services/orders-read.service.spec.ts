@@ -44,6 +44,7 @@ describe('OrdersReadService', () => {
     sub: 9,
     email: 'owner@example.test',
     role: UserRole.Customer,
+    jti: 'token-1',
   };
 
   beforeEach(async () => {

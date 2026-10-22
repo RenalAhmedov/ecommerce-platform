@@ -57,6 +57,10 @@ export class TestApp {
     return new TestApp(app, `http://127.0.0.1:${port}/api`, sendMail);
   }
 
+  url(path: string): string {
+    return this.baseUrl + path;
+  }
+
   get dataSource(): DataSource {
     return this.app.get(DataSource);
   }
@@ -70,7 +74,7 @@ export class TestApp {
     path: string,
     { body, token, headers = {} }: RequestOptions = {},
   ): Promise<ApiResponse<T>> {
-    const response = await fetch(this.baseUrl + path, {
+    const response = await fetch(this.url(path), {
       method,
       headers: {
         'content-type': 'application/json',
@@ -82,7 +86,7 @@ export class TestApp {
 
     return {
       status: response.status,
-      body: (await response.json()) as T,
+      body: parseJson<T>(await response.text()),
       headers: response.headers,
     };
   }
@@ -127,6 +131,10 @@ export class TestApp {
   close(): Promise<void> {
     return this.app.close();
   }
+}
+
+function parseJson<T>(text: string): T {
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 export async function waitFor(
