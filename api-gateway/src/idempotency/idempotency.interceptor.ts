@@ -14,6 +14,7 @@ import type { Response } from 'express';
 import { createHash } from 'node:crypto';
 import { catchError, mergeMap, type Observable, of } from 'rxjs';
 import type { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface.js';
+import { describeError } from '../common/utils/describe-error.js';
 import {
   IDEMPOTENCY_HEADER,
   IDEMPOTENCY_KEY_PATTERN,
@@ -77,7 +78,9 @@ export class IdempotencyInterceptor implements NestInterceptor {
     try {
       return await this.idempotencyStore.claim(key, fingerprint);
     } catch (error) {
-      this.logger.warn(`Idempotency store unavailable: ${describe(error)}`);
+      this.logger.warn(
+        `Idempotency store unavailable: ${describeError(error)}`,
+      );
       throw new ServiceUnavailableException(
         'Idempotent requests are temporarily unavailable, please retry shortly',
       );
@@ -132,7 +135,7 @@ export class IdempotencyInterceptor implements NestInterceptor {
       await this.idempotencyStore.release(key);
     } catch (releaseError) {
       this.logger.warn(
-        `Could not release idempotency key ${key}: ${describe(releaseError)}`,
+        `Could not release idempotency key ${key}: ${describeError(releaseError)}`,
       );
     }
   }
@@ -145,12 +148,8 @@ export class IdempotencyInterceptor implements NestInterceptor {
       await this.idempotencyStore.complete(key, record);
     } catch (error) {
       this.logger.warn(
-        `Could not store idempotent result for ${key}: ${describe(error)}`,
+        `Could not store idempotent result for ${key}: ${describeError(error)}`,
       );
     }
   }
-}
-
-function describe(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

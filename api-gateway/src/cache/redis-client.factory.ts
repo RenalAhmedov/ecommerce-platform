@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import { Redis } from 'ioredis';
+import { describeError } from '../common/utils/describe-error.js';
 import type { EnvironmentVariables } from '../config/interfaces/environment-variables.interface.js';
 
 export function createRedisClient(
@@ -18,11 +19,11 @@ export function createRedisClient(
 
   let available = true;
 
-  redis.on('error', (error: Error & { code?: string }) => {
+  redis.on('error', (error: Error) => {
     if (available) {
       available = false;
       logger.warn(
-        `Redis unavailable, serving without cache (${error.code ?? (error.message || error.name)})`,
+        `Redis unavailable, serving without cache (${describeError(error)})`,
       );
     }
   });

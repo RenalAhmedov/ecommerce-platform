@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { type EntityManager, Repository } from 'typeorm';
+import {
+  acquireAdvisoryLocks,
+  advisoryLockKeys,
+} from '../database/advisory-locks.js';
 import { PRODUCT_COLUMNS } from './constants/product-query.constants.js';
 import type { ProductQueryDto } from './dto/product-query.dto.js';
 import { Product } from './entities/product.entity.js';
@@ -52,18 +56,13 @@ export class ProductsRepository {
     return product !== null;
   }
 
-  async lockUniqueValues(values: UniqueProductValues): Promise<void> {
-    const lockKeys = Object.entries(values)
-      .filter(([, value]) => value !== undefined)
-      .map(([column, value]) => `products.${column}:${value}`)
-      .sort();
+  lockUniqueValues({ sku, slug }: UniqueProductValues): Promise<void> {
+    const keys = [
+      sku === undefined ? null : advisoryLockKeys.productSku(sku),
+      slug === undefined ? null : advisoryLockKeys.productSlug(slug),
+    ].filter((key) => key !== null);
 
-    for (const lockKey of lockKeys) {
-      await this.repository.query(
-        'SELECT pg_advisory_xact_lock(hashtext($1))',
-        [lockKey],
-      );
-    }
+    return acquireAdvisoryLocks(this.repository, keys);
   }
 
   findActivePaginated(filters: ProductQueryDto): Promise<[Product[], number]> {

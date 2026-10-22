@@ -24,7 +24,7 @@ import { OrderEmailsProducer } from './queues/order-emails.producer.js';
 import { ORDER_MAINTENANCE_QUEUE } from './queues/order-maintenance.constants.js';
 import { OrderMaintenanceProcessor } from './queues/order-maintenance.processor.js';
 import { OrderMaintenanceScheduler } from './queues/order-maintenance.scheduler.js';
-import { OrderConfirmationSweeper } from './services/order-confirmation-sweeper.service.js';
+import { OrderConfirmationSweepService } from './services/order-confirmation-sweep.service.js';
 import { OrderExpiryService } from './services/order-expiry.service.js';
 import { OrderPaymentService } from './services/order-payment.service.js';
 import { OrderPlacementService } from './services/order-placement.service.js';
@@ -69,7 +69,7 @@ import { OrderValidator } from './validators/order.validator.js';
     OrderEmailsProcessor,
     OrderEventsPublisher,
     OrderExpiryService,
-    OrderConfirmationSweeper,
+    OrderConfirmationSweepService,
     OrderMaintenanceScheduler,
     OrderMaintenanceProcessor,
   ],

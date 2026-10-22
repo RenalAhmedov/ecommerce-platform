@@ -3,7 +3,7 @@ import { Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
 import { ThrottledWarning } from '../../common/logging/throttled-warning.js';
 import { describeError } from '../../common/utils/describe-error.js';
-import { OrderConfirmationSweeper } from '../services/order-confirmation-sweeper.service.js';
+import { OrderConfirmationSweepService } from '../services/order-confirmation-sweep.service.js';
 import { OrderExpiryService } from '../services/order-expiry.service.js';
 import {
   EXPIRE_STALE_ORDERS_JOB,
@@ -18,7 +18,7 @@ export class OrderMaintenanceProcessor extends WorkerHost {
 
   constructor(
     private readonly orderExpiryService: OrderExpiryService,
-    private readonly orderConfirmationSweeper: OrderConfirmationSweeper,
+    private readonly orderConfirmationSweepService: OrderConfirmationSweepService,
   ) {
     super();
   }
@@ -28,7 +28,7 @@ export class OrderMaintenanceProcessor extends WorkerHost {
       case EXPIRE_STALE_ORDERS_JOB:
         return this.orderExpiryService.expireStaleOrders();
       case SWEEP_CONFIRMATION_EMAILS_JOB:
-        return this.orderConfirmationSweeper.sweep();
+        return this.orderConfirmationSweepService.sweep();
       default:
         throw new Error(`Unknown order maintenance job "${job.name}"`);
     }

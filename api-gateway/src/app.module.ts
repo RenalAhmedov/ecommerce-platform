@@ -15,6 +15,7 @@ import { RequestLoggerMiddleware } from './common/middleware/request-logger.midd
 import { validateEnv } from './config/env.validation.js';
 import type { EnvironmentVariables } from './config/interfaces/environment-variables.interface.js';
 import { createDataSourceOptions } from './database/database.config.js';
+import { createQueueConnectionOptions } from './messaging/queue-connection.options.js';
 import { OrdersModule } from './orders/orders.module.js';
 import { ProductsModule } from './products/products.module.js';
 
@@ -39,13 +40,7 @@ import { ProductsModule } from './products/products.module.js';
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService<EnvironmentVariables, true>) => ({
-        connection: {
-          host: config.get('REDIS_HOST'),
-          port: config.get('REDIS_PORT'),
-          db: config.get('REDIS_DB'),
-          enableOfflineQueue: false,
-          maxRetriesPerRequest: null,
-        },
+        connection: createQueueConnectionOptions(config),
       }),
     }),
     CacheModule,

@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { describeError } from '../../common/utils/describe-error.js';
 import type { ChargeResult } from '../../payments/interfaces/charge.interface.js';
 import { PaymentGateway } from '../../payments/payment.gateway.js';
 import { OrderStatus } from '../enums/order-status.enum.js';
@@ -49,8 +50,9 @@ export class OrderPaymentService {
         token,
       });
     } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Payment for ${order.orderNumber} failed: ${reason}`);
+      this.logger.error(
+        `Payment for ${order.orderNumber} failed: ${describeError(error)}`,
+      );
 
       return { status: 'declined', reason: 'gateway_error' };
     }

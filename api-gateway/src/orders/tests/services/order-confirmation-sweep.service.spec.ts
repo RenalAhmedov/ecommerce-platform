@@ -1,10 +1,10 @@
 import { Test } from '@nestjs/testing';
 import { OrdersRepository } from '../../orders.repository.js';
 import { OrderEmailsProducer } from '../../queues/order-emails.producer.js';
-import { OrderConfirmationSweeper } from '../../services/order-confirmation-sweeper.service.js';
+import { OrderConfirmationSweepService } from '../../services/order-confirmation-sweep.service.js';
 
-describe('OrderConfirmationSweeper', () => {
-  let sweeper: OrderConfirmationSweeper;
+describe('OrderConfirmationSweepService', () => {
+  let sweeper: OrderConfirmationSweepService;
   let repository: { findIdsPaidSince: ReturnType<typeof vi.fn> };
   let emails: { queueConfirmations: ReturnType<typeof vi.fn> };
 
@@ -15,13 +15,13 @@ describe('OrderConfirmationSweeper', () => {
 
     const moduleRef = await Test.createTestingModule({
       providers: [
-        OrderConfirmationSweeper,
+        OrderConfirmationSweepService,
         { provide: OrdersRepository, useValue: repository },
         { provide: OrderEmailsProducer, useValue: emails },
       ],
     }).compile();
 
-    sweeper = moduleRef.get(OrderConfirmationSweeper);
+    sweeper = moduleRef.get(OrderConfirmationSweepService);
   });
 
   afterEach(() => {

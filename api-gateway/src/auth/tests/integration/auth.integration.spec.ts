@@ -81,4 +81,19 @@ describe('Auth (integration)', () => {
     expect(statuses).toEqual([201, ...Array<number>(9).fill(409)]);
     expect(await testApp.query('SELECT id FROM users')).toHaveLength(1);
   });
+
+  it('keeps the email of a soft-deleted user reserved so it can be restored', async () => {
+    await testApp.signUp('ada@example.test');
+    await testApp.query('UPDATE users SET deleted_at = now()');
+
+    const login = await testApp.request('POST', '/auth/login', {
+      body: { email: 'ada@example.test', password: 'password123' },
+    });
+    const registerAgain = await testApp.request('POST', '/auth/register', {
+      body: { name: 'Ada', email: 'ADA@example.test', password: 'password123' },
+    });
+
+    expect(login.status).toBe(401);
+    expect(registerAgain.status).toBe(409);
+  });
 });

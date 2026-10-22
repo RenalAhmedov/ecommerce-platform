@@ -6,7 +6,7 @@ import type {
 } from '../interfaces/charge.interface.js';
 import { PaymentGateway } from '../payment.gateway.js';
 
-export const DECLINED_PAYMENT_TOKEN = 'tok_declined';
+const DECLINED_PAYMENT_TOKEN = 'tok_declined';
 
 @Injectable()
 export class MockPaymentGateway extends PaymentGateway {

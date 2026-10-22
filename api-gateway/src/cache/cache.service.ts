@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Redis } from 'ioredis';
+import { describeError } from '../common/utils/describe-error.js';
 import type { EnvironmentVariables } from '../config/interfaces/environment-variables.interface.js';
 import { REDIS_CLIENT } from './constants/cache.constants.js';
 
@@ -75,7 +76,8 @@ export class CacheService {
   }
 
   private logFailure(action: string, key: string, error: unknown): void {
-    const reason = error instanceof Error ? error.message : String(error);
-    this.logger.warn(`Cache ${action} failed for "${key}": ${reason}`);
+    this.logger.warn(
+      `Cache ${action} failed for "${key}": ${describeError(error)}`,
+    );
   }
 }

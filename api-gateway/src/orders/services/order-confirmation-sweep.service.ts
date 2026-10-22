@@ -4,7 +4,7 @@ import { OrdersRepository } from '../orders.repository.js';
 import { OrderEmailsProducer } from '../queues/order-emails.producer.js';
 
 @Injectable()
-export class OrderConfirmationSweeper {
+export class OrderConfirmationSweepService {
   constructor(
     private readonly ordersRepository: OrdersRepository,
     private readonly orderEmailsProducer: OrderEmailsProducer,
