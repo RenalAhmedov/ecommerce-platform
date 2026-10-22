@@ -9,4 +9,7 @@ export interface EnvironmentVariables {
   DB_LOGGING: boolean;
   JWT_SECRET: string;
   JWT_EXPIRES_IN: number;
+  REDIS_HOST: string;
+  REDIS_PORT: number;
+  CACHE_TTL_SECONDS: number;
 }

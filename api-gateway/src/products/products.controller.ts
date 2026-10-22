@@ -18,24 +18,28 @@ import { CreateProductDto } from './dto/create-product.dto.js';
 import { ProductQueryDto } from './dto/product-query.dto.js';
 import type { ProductResponseDto } from './dto/product-response.dto.js';
 import { UpdateProductDto } from './dto/update-product.dto.js';
-import { ProductsService } from './products.service.js';
+import { ProductsReadService } from './services/products-read.service.js';
+import { ProductsWriteService } from './services/products-write.service.js';
 
 @Controller('products')
 export class ProductsController {
-  constructor(private readonly productsService: ProductsService) {}
+  constructor(
+    private readonly productsReadService: ProductsReadService,
+    private readonly productsWriteService: ProductsWriteService,
+  ) {}
 
   @Public()
   @Get()
   findAll(
     @Query() filters: ProductQueryDto,
   ): Promise<Paginated<ProductResponseDto>> {
-    return this.productsService.findAll(filters);
+    return this.productsReadService.findAll(filters);
   }
 
   @Public()
   @Get(':id')
   findOne(@Param('id', ParseIdPipe) id: number): Promise<ProductResponseDto> {
-    return this.productsService.findOne(id);
+    return this.productsReadService.findOne(id);
   }
 
   @Roles(UserRole.Admin)
@@ -44,7 +48,7 @@ export class ProductsController {
     @Body() dto: CreateProductDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ProductResponseDto> {
-    return this.productsService.create(dto, req.user.sub);
+    return this.productsWriteService.create(dto, req.user.sub);
   }
 
   @Roles(UserRole.Admin)
@@ -53,6 +57,6 @@ export class ProductsController {
     @Param('id', ParseIdPipe) id: number,
     @Body() dto: UpdateProductDto,
   ): Promise<ProductResponseDto> {
-    return this.productsService.update(id, dto);
+    return this.productsWriteService.update(id, dto);
   }
 }
