@@ -10,6 +10,18 @@ export class UsersRepository {
     private readonly repository: Repository<User>,
   ) {}
 
+  transaction<T>(work: (users: UsersRepository) => Promise<T>): Promise<T> {
+    return this.repository.manager.transaction((manager) =>
+      work(new UsersRepository(manager.getRepository(User))),
+    );
+  }
+
+  async lockEmail(email: string): Promise<void> {
+    await this.repository.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+      `users.email:${email.toLowerCase()}`,
+    ]);
+  }
+
   findById(id: number): Promise<User | null> {
     return this.repository.findOneBy({ id });
   }

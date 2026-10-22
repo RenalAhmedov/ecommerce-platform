@@ -1,0 +1,65 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
+import type { Paginated } from '../../common/interfaces/paginated.interface.js';
+import type { ProductQueryDto } from '../dto/product-query.dto.js';
+import { ProductResponseDto } from '../dto/product-response.dto.js';
+import { ProductsCache } from '../products.cache.js';
+import { ProductsRepository } from '../products.repository.js';
+import { ProductValidator } from '../validators/product.validator.js';
+
+@Injectable()
+export class ProductsReadService {
+  constructor(
+    private readonly productsRepository: ProductsRepository,
+    private readonly productsCache: ProductsCache,
+    private readonly productValidator: ProductValidator,
+  ) {}
+
+  findAll(filters: ProductQueryDto): Promise<Paginated<ProductResponseDto>> {
+    this.productValidator.ensureValidPriceRange(filters);
+
+    return this.productsCache.list(filters, () =>
+      this.loadProductList(filters),
+    );
+  }
+
+  findOne(id: number): Promise<ProductResponseDto> {
+    return this.productsCache.detail(id, () => this.loadActiveProduct(id));
+  }
+
+  async findById(id: number): Promise<ProductResponseDto> {
+    const product = await this.productsRepository.findById(id);
+
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    return ProductResponseDto.fromEntity(product);
+  }
+
+  private async loadProductList(
+    filters: ProductQueryDto,
+  ): Promise<Paginated<ProductResponseDto>> {
+    const [products, total] =
+      await this.productsRepository.findActivePaginated(filters);
+
+    return {
+      data: products.map((product) => ProductResponseDto.fromEntity(product)),
+      meta: {
+        page: filters.page,
+        limit: filters.limit,
+        total,
+        totalPages: Math.ceil(total / filters.limit),
+      },
+    };
+  }
+
+  private async loadActiveProduct(id: number): Promise<ProductResponseDto> {
+    const product = await this.productsRepository.findActiveById(id);
+
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    return ProductResponseDto.fromEntity(product);
+  }
+}

@@ -1,0 +1,340 @@
+{
+  "info": {
+    "name": "E-commerce API (Nest.js)",
+    "description": "Auth and products endpoints of the api-gateway. Run the requests in folder order: the login requests store the tokens and the create request stores the product id in collection variables.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000/api" },
+    { "key": "customerToken", "value": "" },
+    { "key": "adminToken", "value": "" },
+    { "key": "productId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Auth",
+      "item": [
+        {
+          "name": "Register customer",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Demo Customer\",\n  \"email\": \"customer@example.com\",\n  \"password\": \"password123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('customerToken', pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"customer@example.com\",\n  \"password\": \"password123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Register admin (then promote with SQL, see README)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Demo Admin\",\n  \"email\": \"admin@example.com\",\n  \"password\": \"password123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login admin (after the SQL promotion)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('token has admin role', () => pm.expect(pm.response.json().user.role).to.eql('admin'));",
+                  "pm.collectionVariables.set('adminToken', pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"password123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Me (admin)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/auth/me"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Products - admin",
+      "item": [
+        {
+          "name": "Create product (full)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('productId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/products",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Mechanical Keyboard\",\n  \"sku\": \"mk-001\",\n  \"price\": 89.90,\n  \"description\": \"RGB, brown switches\",\n  \"categoryId\": 1,\n  \"initialStock\": 25\n}"
+            }
+          }
+        },
+        {
+          "name": "Create product (minimal, slug generated)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/products",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Café Crème Mug\",\n  \"sku\": \"MUG-1\",\n  \"price\": 12.5\n}"
+            }
+          }
+        },
+        {
+          "name": "Create hidden product (isActive false)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/products",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Secret Prototype\",\n  \"sku\": \"PROTO-1\",\n  \"price\": 999,\n  \"isActive\": false\n}"
+            }
+          }
+        },
+        {
+          "name": "Update product (partial)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/products/{{productId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price\": 79.99,\n  \"description\": \"Now on sale\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update product: clear description and category",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/products/{{productId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": null,\n  \"categoryId\": null\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Products - public (cached)",
+      "item": [
+        {
+          "name": "List (default: newest first)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/products"
+          }
+        },
+        {
+          "name": "List with all filters",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products?search=key&categoryId=1&minPrice=10&maxPrice=100&sortBy=price&sortOrder=asc&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["products"],
+              "query": [
+                { "key": "search", "value": "key" },
+                { "key": "categoryId", "value": "1" },
+                { "key": "minPrice", "value": "10" },
+                { "key": "maxPrice", "value": "100" },
+                { "key": "sortBy", "value": "price" },
+                { "key": "sortOrder", "value": "asc" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get product by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/products/{{productId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Expected errors",
+      "item": [
+        {
+          "name": "401 - create without token",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('status 401', () => pm.response.to.have.status(401));"] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/products",
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"X\",\n  \"sku\": \"X-1\",\n  \"price\": 1\n}" }
+          }
+        },
+        {
+          "name": "403 - create as customer",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('status 403', () => pm.response.to.have.status(403));"] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{customerToken}}" }
+            ],
+            "url": "{{baseUrl}}/products",
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"X\",\n  \"sku\": \"X-1\",\n  \"price\": 1\n}" }
+          }
+        },
+        {
+          "name": "409 - duplicate SKU (other spelling)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('status 409', () => pm.response.to.have.status(409));"] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/products",
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Another Keyboard\",\n  \"sku\": \" MK-001 \",\n  \"price\": 1\n}" }
+          }
+        },
+        {
+          "name": "400 - invalid body (several errors at once)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('status 400', () => pm.response.to.have.status(400));"] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/products",
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"\",\n  \"sku\": \"bad sku!\",\n  \"price\": -1.999,\n  \"slug\": \"Bad Slug\",\n  \"isAdmin\": true\n}" }
+          }
+        },
+        {
+          "name": "400 - unknown category",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('status 400', () => pm.response.to.have.status(400));"] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/products",
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Lost Thing\",\n  \"sku\": \"LOST-1\",\n  \"price\": 1,\n  \"categoryId\": 999\n}" }
+          }
+        },
+        {
+          "name": "400 - update with empty body",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('status 400', () => pm.response.to.have.status(400));"] } }],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/products/{{productId}}",
+            "body": { "mode": "raw", "raw": "{}" }
+          }
+        },
+        {
+          "name": "400 - list with minPrice > maxPrice",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('status 400', () => pm.response.to.have.status(400));"] } }],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/products?minPrice=50&maxPrice=10"
+          }
+        },
+        {
+          "name": "400 - invalid id",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('status 400', () => pm.response.to.have.status(400));"] } }],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/products/abc"
+          }
+        },
+        {
+          "name": "404 - unknown product",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('status 404', () => pm.response.to.have.status(404));"] } }],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/products/999999"
+          }
+        }
+      ]
+    }
+  ]
+}
