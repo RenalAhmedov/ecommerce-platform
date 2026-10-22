@@ -12,6 +12,8 @@ import type { RegisterDto } from './dto/register.dto.js';
 import type { JwtPayload } from './interfaces/jwt-payload.interface.js';
 
 const BCRYPT_ROUNDS = 12;
+const UNKNOWN_USER_PASSWORD_HASH =
+  '$2b$12$SrBe8r37aBtFdLoLw9JwFeuMVboLs3lO2HAx43SNDHhwmY78aSBFm';
 
 @Injectable()
 export class AuthService {
@@ -33,8 +35,12 @@ export class AuthService {
 
   async login(dto: LoginDto): Promise<AuthResponseDto> {
     const user = await this.usersService.findByEmailWithPassword(dto.email);
+    const passwordMatches = await bcrypt.compare(
+      dto.password,
+      user?.password ?? UNKNOWN_USER_PASSWORD_HASH,
+    );
 
-    if (!user || !(await bcrypt.compare(dto.password, user.password))) {
+    if (!user || !passwordMatches) {
       throw new UnauthorizedException('Invalid credentials');
     }
 

@@ -118,6 +118,7 @@ export class ProductsRepository {
   ): Promise<boolean> {
     const productsQuery = this.repository
       .createQueryBuilder('product')
+      .withDeleted()
       .where(`product.${column} = :value`, { value });
 
     if (excludeId !== undefined) {

@@ -40,6 +40,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
   private toStatusAndMessage(
     exception: unknown,
   ): Pick<ErrorResponse, 'statusCode' | 'error' | 'message'> {
+    if (isClientHttpError(exception)) {
+      return {
+        statusCode: exception.status,
+        error: STATUS_CODES[exception.status] ?? 'Error',
+        message: exception.message,
+      };
+    }
+
     if (!(exception instanceof HttpException)) {
       return {
         statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
@@ -67,4 +75,16 @@ export class AllExceptionsFilter implements ExceptionFilter {
       message: message ?? exception.message,
     };
   }
+}
+
+function isClientHttpError(
+  exception: unknown,
+): exception is Error & { status: number } {
+  return (
+    exception instanceof Error &&
+    'expose' in exception &&
+    exception.expose === true &&
+    'status' in exception &&
+    typeof exception.status === 'number'
+  );
 }
