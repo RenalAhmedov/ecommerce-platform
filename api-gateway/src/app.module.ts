@@ -14,6 +14,7 @@ import { RequestLoggerMiddleware } from './common/middleware/request-logger.midd
 import { validateEnv } from './config/env.validation.js';
 import type { EnvironmentVariables } from './config/interfaces/environment-variables.interface.js';
 import { createDataSourceOptions } from './database/database.config.js';
+import { OrdersModule } from './orders/orders.module.js';
 import { ProductsModule } from './products/products.module.js';
 
 @Module({
@@ -37,6 +38,7 @@ import { ProductsModule } from './products/products.module.js';
     CacheModule,
     AuthModule,
     ProductsModule,
+    OrdersModule,
   ],
   providers: [
     {

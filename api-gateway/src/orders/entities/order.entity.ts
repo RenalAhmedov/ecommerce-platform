@@ -13,6 +13,7 @@ import {
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity.js';
 import { OrderStatus } from '../enums/order-status.enum.js';
+import type { ShippingAddress } from '../interfaces/shipping-address.interface.js';
 import { OrderItem } from './order-item.entity.js';
 
 @Entity('orders')
@@ -54,7 +55,7 @@ export class Order {
   paymentReference: string | null;
 
   @Column({ name: 'shipping_address', type: 'jsonb', nullable: true })
-  shippingAddress: Record<string, unknown> | null;
+  shippingAddress: ShippingAddress | null;
 
   @Column({ name: 'paid_at', type: 'timestamptz', nullable: true })
   paidAt: Date | null;

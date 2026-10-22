@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Paginated } from '../../common/interfaces/paginated.interface.js';
+import { toPaginated } from '../../common/utils/paginate.js';
 import type { ProductQueryDto } from '../dto/product-query.dto.js';
 import { ProductResponseDto } from '../dto/product-response.dto.js';
 import { ProductsCache } from '../products.cache.js';
@@ -32,15 +33,11 @@ export class ProductsReadService {
     const [products, total] =
       await this.productsRepository.findActivePaginated(filters);
 
-    return {
-      data: products.map((product) => ProductResponseDto.fromEntity(product)),
-      meta: {
-        page: filters.page,
-        limit: filters.limit,
-        total,
-        totalPages: Math.ceil(total / filters.limit),
-      },
-    };
+    return toPaginated(
+      products.map((product) => ProductResponseDto.fromEntity(product)),
+      total,
+      filters,
+    );
   }
 
   private async loadActiveProduct(id: number): Promise<ProductResponseDto> {
