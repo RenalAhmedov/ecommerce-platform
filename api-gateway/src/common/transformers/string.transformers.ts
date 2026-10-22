@@ -4,6 +4,10 @@ export function trim({ value }: TransformFnParams): unknown {
   return typeof value === 'string' ? value.trim() : value;
 }
 
+export function toUpperCase({ value }: TransformFnParams): unknown {
+  return typeof value === 'string' ? value.toUpperCase() : value;
+}
+
 export function normalizeEmail({ value }: TransformFnParams): unknown {
   return typeof value === 'string' ? value.trim().toLowerCase() : value;
 }
