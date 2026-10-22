@@ -61,6 +61,34 @@ export class OrdersRepository {
     return this.createWithItemsQuery(id).getOneOrFail();
   }
 
+  findForConfirmation(id: number): Promise<Order | null> {
+    return this.createWithItemsQuery(id)
+      .leftJoin('order.user', 'user')
+      .addSelect(['user.id', 'user.name', 'user.email'])
+      .getOne();
+  }
+
+  findStalePending(createdBefore: Date, limit: number): Promise<Order[]> {
+    return this.orders
+      .createQueryBuilder('order')
+      .leftJoinAndSelect('order.items', 'item')
+      .where('order.status = :status', { status: OrderStatus.Pending })
+      .andWhere('order.createdAt < :createdBefore', { createdBefore })
+      .orderBy('order.createdAt', 'ASC')
+      .take(limit)
+      .getMany();
+  }
+
+  async findIdsPaidSince(paidSince: Date): Promise<number[]> {
+    const orders = await this.orders
+      .createQueryBuilder('order')
+      .select('order.id')
+      .where('order.paidAt >= :paidSince', { paidSince })
+      .getMany();
+
+    return orders.map((order) => order.id);
+  }
+
   async createWithItems(data: NewOrder, items: NewOrderItem[]): Promise<Order> {
     const order = await this.orders.save(this.orders.create(data));
 

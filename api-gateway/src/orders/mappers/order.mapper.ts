@@ -2,8 +2,13 @@ import { fromCents, toCents } from '../../common/utils/money.js';
 import type { PurchasableProduct } from '../../products/types/product.types.js';
 import type { CreateOrderDto } from '../dto/create-order.dto.js';
 import type { OrderItemDto } from '../dto/order-item.dto.js';
+import type { Order } from '../entities/order.entity.js';
 import { OrderStatus } from '../enums/order-status.enum.js';
-import type { NewOrder, NewOrderItem } from '../types/order.types.js';
+import type {
+  NewOrder,
+  NewOrderItem,
+  PlacedOrder,
+} from '../types/order.types.js';
 import { generateOrderNumber } from '../utils/order-number.js';
 
 export function toOrderLines(
@@ -33,6 +38,19 @@ export function toOrderLines(
 
 export function sumLineTotals(lines: NewOrderItem[]): number {
   return lines.reduce((sum, line) => sum + toCents(line.lineTotal), 0);
+}
+
+export function toPlacedOrder(order: Order): PlacedOrder {
+  return {
+    id: order.id,
+    orderNumber: order.orderNumber,
+    userId: order.userId,
+    total: order.total,
+    items: order.items.map(({ productId, quantity }) => ({
+      productId,
+      quantity,
+    })),
+  };
 }
 
 export function toNewOrder(

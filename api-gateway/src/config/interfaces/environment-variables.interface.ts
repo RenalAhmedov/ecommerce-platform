@@ -12,4 +12,7 @@ export interface EnvironmentVariables {
   REDIS_HOST: string;
   REDIS_PORT: number;
   CACHE_TTL_SECONDS: number;
+  MAIL_HOST: string;
+  MAIL_PORT: number;
+  MAIL_FROM: string;
 }

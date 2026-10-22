@@ -20,6 +20,10 @@ const envValidationSchema = Joi.object<EnvironmentVariables>({
   REDIS_HOST: Joi.string().default('localhost'),
   REDIS_PORT: Joi.number().port().default(6379),
   CACHE_TTL_SECONDS: Joi.number().integer().positive().default(60),
+
+  MAIL_HOST: Joi.string().default('localhost'),
+  MAIL_PORT: Joi.number().port().default(1025),
+  MAIL_FROM: Joi.string().default('Shop <no-reply@shop.local>'),
 });
 
 export function validateEnv(
