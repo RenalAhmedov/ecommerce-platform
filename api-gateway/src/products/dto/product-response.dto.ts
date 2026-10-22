@@ -8,6 +8,7 @@ export class ProductResponseDto {
   description: string | null;
   price: string;
   imagePath: string | null;
+  isActive: boolean;
   category: { id: number; name: string } | null;
   stock: number;
   createdAt: Date;
@@ -22,6 +23,7 @@ export class ProductResponseDto {
       description: product.description,
       price: product.price,
       imagePath: product.imagePath,
+      isActive: product.isActive,
       category: product.category
         ? { id: product.category.id, name: product.category.name }
         : null,

@@ -1,29 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, type SelectQueryBuilder } from 'typeorm';
+import { Repository } from 'typeorm';
+import { InventoryMovement } from '../inventory/entities/inventory-movement.entity.js';
+import { Inventory } from '../inventory/entities/inventory.entity.js';
+import { InventoryMovementReason } from '../inventory/enums/inventory-movement-reason.enum.js';
+import { PRODUCT_COLUMNS } from './constants/product-query.constants.js';
 import type { ProductQueryDto } from './dto/product-query.dto.js';
 import { Product } from './entities/product.entity.js';
-import { ProductSortField } from './enums/product-sort-field.enum.js';
-
-type ProductsQuery = SelectQueryBuilder<Product>;
-
-const PRODUCT_COLUMNS = [
-  'product.id',
-  'product.name',
-  'product.slug',
-  'product.sku',
-  'product.description',
-  'product.price',
-  'product.imagePath',
-  'product.createdAt',
-  'product.updatedAt',
-];
-
-const SORT_COLUMNS: Record<ProductSortField, string> = {
-  [ProductSortField.CreatedAt]: 'product.createdAt',
-  [ProductSortField.Price]: 'product.price',
-  [ProductSortField.Name]: 'product.name',
-};
+import { ProductListQuery } from './queries/product-list.query.js';
+import type {
+  NewProduct,
+  ProductChanges,
+  ProductsQuery,
+  UniqueProductValues,
+} from './types/product.types.js';
 
 @Injectable()
 export class ProductsRepository {
@@ -32,16 +22,43 @@ export class ProductsRepository {
     private readonly repository: Repository<Product>,
   ) {}
 
+  transaction<T>(
+    work: (products: ProductsRepository) => Promise<T>,
+  ): Promise<T> {
+    return this.repository.manager.transaction((manager) =>
+      work(new ProductsRepository(manager.getRepository(Product))),
+    );
+  }
+
+  async lockById(id: number): Promise<boolean> {
+    const product = await this.repository
+      .createQueryBuilder('product')
+      .select('product.id')
+      .where('product.id = :id', { id })
+      .setLock('pessimistic_write')
+      .getOne();
+
+    return product !== null;
+  }
+
+  async lockUniqueValues(values: UniqueProductValues): Promise<void> {
+    const lockKeys = Object.entries(values)
+      .filter(([, value]) => value !== undefined)
+      .map(([column, value]) => `products.${column}:${value}`)
+      .sort();
+
+    for (const lockKey of lockKeys) {
+      await this.repository.query(
+        'SELECT pg_advisory_xact_lock(hashtext($1))',
+        [lockKey],
+      );
+    }
+  }
+
   findActivePaginated(filters: ProductQueryDto): Promise<[Product[], number]> {
-    const productsQuery = this.createActiveProductsQuery();
-
-    this.applySearch(productsQuery, filters.search);
-    this.applyCategory(productsQuery, filters.categoryId);
-    this.applyPriceRange(productsQuery, filters.minPrice, filters.maxPrice);
-    this.applySorting(productsQuery, filters);
-    this.applyPagination(productsQuery, filters);
-
-    return productsQuery.getManyAndCount();
+    return new ProductListQuery(filters)
+      .applyTo(this.createActiveProductsQuery())
+      .getManyAndCount();
   }
 
   findActiveById(id: number): Promise<Product | null> {
@@ -50,69 +67,77 @@ export class ProductsRepository {
       .getOne();
   }
 
-  private createActiveProductsQuery(): ProductsQuery {
+  findById(id: number): Promise<Product | null> {
+    return this.createProductsQuery()
+      .where('product.id = :id', { id })
+      .getOne();
+  }
+
+  existsBySku(sku: string, excludeId?: number): Promise<boolean> {
+    return this.existsByColumn('sku', sku, excludeId);
+  }
+
+  existsBySlug(slug: string, excludeId?: number): Promise<boolean> {
+    return this.existsByColumn('slug', slug, excludeId);
+  }
+
+  createWithInventory(
+    data: NewProduct,
+    initialStock: number,
+    createdBy: number,
+  ): Promise<Product> {
+    return this.repository.manager.transaction(async (manager) => {
+      const product = await manager.save(manager.create(Product, data));
+
+      await manager.insert(Inventory, {
+        productId: product.id,
+        quantity: initialStock,
+      });
+
+      if (initialStock > 0) {
+        await manager.insert(InventoryMovement, {
+          productId: product.id,
+          userId: createdBy,
+          change: initialStock,
+          reason: InventoryMovementReason.Initial,
+        });
+      }
+
+      return product;
+    });
+  }
+
+  async update(id: number, changes: ProductChanges): Promise<void> {
+    await this.repository.update(id, changes);
+  }
+
+  private existsByColumn(
+    column: 'sku' | 'slug',
+    value: string,
+    excludeId?: number,
+  ): Promise<boolean> {
+    const productsQuery = this.repository
+      .createQueryBuilder('product')
+      .where(`product.${column} = :value`, { value });
+
+    if (excludeId !== undefined) {
+      productsQuery.andWhere('product.id <> :excludeId', { excludeId });
+    }
+
+    return productsQuery.getExists();
+  }
+
+  private createProductsQuery(): ProductsQuery {
     return this.repository
       .createQueryBuilder('product')
       .select(PRODUCT_COLUMNS)
       .leftJoin('product.category', 'category')
       .addSelect(['category.id', 'category.name'])
       .leftJoin('product.inventory', 'inventory')
-      .addSelect(['inventory.id', 'inventory.quantity'])
-      .where('product.isActive = true');
+      .addSelect(['inventory.id', 'inventory.quantity']);
   }
 
-  private applySearch(productsQuery: ProductsQuery, search?: string): void {
-    if (!search) {
-      return;
-    }
-
-    productsQuery.andWhere('product.name ILIKE :search', {
-      search: `%${escapeLikePattern(search)}%`,
-    });
+  private createActiveProductsQuery(): ProductsQuery {
+    return this.createProductsQuery().where('product.isActive = true');
   }
-
-  private applyCategory(
-    productsQuery: ProductsQuery,
-    categoryId?: number,
-  ): void {
-    if (categoryId === undefined) {
-      return;
-    }
-
-    productsQuery.andWhere('product.categoryId = :categoryId', { categoryId });
-  }
-
-  private applyPriceRange(
-    productsQuery: ProductsQuery,
-    minPrice?: number,
-    maxPrice?: number,
-  ): void {
-    if (minPrice !== undefined) {
-      productsQuery.andWhere('product.price >= :minPrice', { minPrice });
-    }
-
-    if (maxPrice !== undefined) {
-      productsQuery.andWhere('product.price <= :maxPrice', { maxPrice });
-    }
-  }
-
-  private applySorting(
-    productsQuery: ProductsQuery,
-    { sortBy, sortOrder }: ProductQueryDto,
-  ): void {
-    productsQuery
-      .orderBy(SORT_COLUMNS[sortBy], sortOrder)
-      .addOrderBy('product.id', sortOrder);
-  }
-
-  private applyPagination(
-    productsQuery: ProductsQuery,
-    { page, limit }: ProductQueryDto,
-  ): void {
-    productsQuery.offset((page - 1) * limit).limit(limit);
-  }
-}
-
-function escapeLikePattern(value: string): string {
-  return value.replace(/[\\%_]/g, '\\$&');
 }
