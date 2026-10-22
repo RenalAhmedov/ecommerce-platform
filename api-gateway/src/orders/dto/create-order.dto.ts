@@ -5,6 +5,9 @@ import {
   ArrayUnique,
   IsArray,
   IsDefined,
+  IsNotEmpty,
+  IsString,
+  MaxLength,
   ValidateNested,
 } from 'class-validator';
 import { OrderItemDto } from './order-item.dto.js';
@@ -25,4 +28,9 @@ export class CreateOrderDto {
   @ValidateNested()
   @Type(() => ShippingAddressDto)
   shippingAddress: ShippingAddressDto;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
+  paymentToken: string;
 }

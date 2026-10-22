@@ -9,6 +9,7 @@ import type {
   NewProduct,
   ProductChanges,
   ProductsQuery,
+  PurchasableProduct,
   UniqueProductValues,
 } from './types/product.types.js';
 
@@ -19,12 +20,25 @@ export class ProductsRepository {
     private readonly repository: Repository<Product>,
   ) {}
 
+  withManager(manager: EntityManager): ProductsRepository {
+    return new ProductsRepository(manager.getRepository(Product));
+  }
+
   transaction<T>(
     work: (products: ProductsRepository, manager: EntityManager) => Promise<T>,
   ): Promise<T> {
     return this.repository.manager.transaction((manager) =>
-      work(new ProductsRepository(manager.getRepository(Product)), manager),
+      work(this.withManager(manager), manager),
     );
+  }
+
+  findPurchasableByIds(ids: number[]): Promise<PurchasableProduct[]> {
+    return this.repository
+      .createQueryBuilder('product')
+      .select(['product.id', 'product.name', 'product.price'])
+      .where('product.id IN (:...ids)', { ids })
+      .andWhere('product.isActive = true')
+      .getMany();
   }
 
   async lockById(id: number): Promise<boolean> {
