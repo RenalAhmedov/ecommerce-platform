@@ -1,7 +1,17 @@
-import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  Req,
+  UseInterceptors,
+} from '@nestjs/common';
 import type { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface.js';
 import type { Paginated } from '../common/interfaces/paginated.interface.js';
 import { ParseIdPipe } from '../common/pipes/parse-id.pipe.js';
+import { IdempotencyInterceptor } from '../idempotency/idempotency.interceptor.js';
 import { CreateOrderDto } from './dto/create-order.dto.js';
 import { OrderQueryDto } from './dto/order-query.dto.js';
 import type { OrderResponseDto } from './dto/order-response.dto.js';
@@ -17,6 +27,7 @@ export class OrdersController {
   ) {}
 
   @Post()
+  @UseInterceptors(IdempotencyInterceptor)
   create(
     @Body() dto: CreateOrderDto,
     @Req() req: AuthenticatedRequest,

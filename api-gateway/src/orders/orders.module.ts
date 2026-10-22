@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { IdempotencyModule } from '../idempotency/idempotency.module.js';
 import { InventoryModule } from '../inventory/inventory.module.js';
 import { PaymentsModule } from '../payments/payments.module.js';
 import { ProductsModule } from '../products/products.module.js';
@@ -19,6 +20,7 @@ import { OrderValidator } from './validators/order.validator.js';
     ProductsModule,
     InventoryModule,
     PaymentsModule,
+    IdempotencyModule,
   ],
   controllers: [OrdersController],
   providers: [
