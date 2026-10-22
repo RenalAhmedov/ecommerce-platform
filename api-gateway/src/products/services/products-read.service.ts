@@ -26,16 +26,6 @@ export class ProductsReadService {
     return this.productsCache.detail(id, () => this.loadActiveProduct(id));
   }
 
-  async findById(id: number): Promise<ProductResponseDto> {
-    const product = await this.productsRepository.findById(id);
-
-    if (!product) {
-      throw new NotFoundException('Product not found');
-    }
-
-    return ProductResponseDto.fromEntity(product);
-  }
-
   private async loadProductList(
     filters: ProductQueryDto,
   ): Promise<Paginated<ProductResponseDto>> {

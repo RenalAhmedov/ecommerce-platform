@@ -30,7 +30,6 @@ describe('ProductsReadService', () => {
   let repository: {
     findActivePaginated: ReturnType<typeof vi.fn>;
     findActiveById: ReturnType<typeof vi.fn>;
-    findById: ReturnType<typeof vi.fn>;
   };
   let cache: {
     list: ReturnType<typeof vi.fn>;
@@ -42,7 +41,6 @@ describe('ProductsReadService', () => {
     repository = {
       findActivePaginated: vi.fn(),
       findActiveById: vi.fn(),
-      findById: vi.fn(),
     };
     cache = {
       list: vi.fn((_filters: unknown, load: () => Promise<unknown>) => load()),
@@ -148,23 +146,6 @@ describe('ProductsReadService', () => {
       repository.findActiveById.mockResolvedValue(null);
 
       await expect(service.findOne(99)).rejects.toThrow(NotFoundException);
-    });
-  });
-
-  describe('findById', () => {
-    it('returns the product without using the cache', async () => {
-      repository.findById.mockResolvedValue(buildProduct({ isActive: false }));
-
-      const result = await service.findById(1);
-
-      expect(result.isActive).toBe(false);
-      expect(cache.detail).not.toHaveBeenCalled();
-    });
-
-    it('throws NotFound when the product does not exist', async () => {
-      repository.findById.mockResolvedValue(null);
-
-      await expect(service.findById(99)).rejects.toThrow(NotFoundException);
     });
   });
 });

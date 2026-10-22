@@ -4,11 +4,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { InventoryService } from '../../../inventory/inventory.service.js';
 import type { CreateProductDto } from '../../dto/create-product.dto.js';
 import { ProductsCache } from '../../products.cache.js';
 import { ProductsRepository } from '../../products.repository.js';
 import { ProductValidator } from '../../validators/product.validator.js';
-import { ProductsReadService } from '../../services/products-read.service.js';
 import { ProductsWriteService } from '../../services/products-write.service.js';
 
 describe('ProductsWriteService', () => {
@@ -16,11 +16,12 @@ describe('ProductsWriteService', () => {
   let transactionRepository: {
     lockUniqueValues: ReturnType<typeof vi.fn>;
     lockById: ReturnType<typeof vi.fn>;
-    createWithInventory: ReturnType<typeof vi.fn>;
+    create: ReturnType<typeof vi.fn>;
     update: ReturnType<typeof vi.fn>;
+    getById: ReturnType<typeof vi.fn>;
   };
   let repository: { transaction: ReturnType<typeof vi.fn> };
-  let readService: { findById: ReturnType<typeof vi.fn> };
+  let inventoryService: { initializeStock: ReturnType<typeof vi.fn> };
   let cache: { invalidate: ReturnType<typeof vi.fn> };
   let validator: {
     resolveSlug: ReturnType<typeof vi.fn>;
@@ -30,7 +31,13 @@ describe('ProductsWriteService', () => {
     ensureSlugAvailable: ReturnType<typeof vi.fn>;
   };
 
-  const savedProduct = { id: 7, name: 'Mechanical Keyboard' };
+  const manager = { name: 'transaction-manager' };
+  const savedProduct = {
+    id: 7,
+    name: 'Mechanical Keyboard',
+    category: null,
+    inventory: { quantity: 25 },
+  };
   const createDto: CreateProductDto = {
     name: 'Mechanical Keyboard',
     sku: 'MK-001',
@@ -43,15 +50,17 @@ describe('ProductsWriteService', () => {
     transactionRepository = {
       lockUniqueValues: vi.fn(),
       lockById: vi.fn().mockResolvedValue(true),
-      createWithInventory: vi.fn().mockResolvedValue({ id: 7 }),
+      create: vi.fn().mockResolvedValue({ id: 7 }),
       update: vi.fn(),
+      getById: vi.fn().mockResolvedValue(savedProduct),
     };
     repository = {
-      transaction: vi.fn((work: (products: unknown) => Promise<unknown>) =>
-        work(transactionRepository),
+      transaction: vi.fn(
+        (work: (products: unknown, manager: unknown) => Promise<unknown>) =>
+          work(transactionRepository, manager),
       ),
     };
-    readService = { findById: vi.fn().mockResolvedValue(savedProduct) };
+    inventoryService = { initializeStock: vi.fn() };
     cache = { invalidate: vi.fn() };
     validator = {
       resolveSlug: vi.fn().mockReturnValue('mechanical-keyboard'),
@@ -65,9 +74,9 @@ describe('ProductsWriteService', () => {
       providers: [
         ProductsWriteService,
         { provide: ProductsRepository, useValue: repository },
-        { provide: ProductsReadService, useValue: readService },
         { provide: ProductsCache, useValue: cache },
         { provide: ProductValidator, useValue: validator },
+        { provide: InventoryService, useValue: inventoryService },
       ],
     }).compile();
 
@@ -96,24 +105,31 @@ describe('ProductsWriteService', () => {
       const skuCheckOrder =
         validator.ensureSkuAvailable.mock.invocationCallOrder[0];
       const insertOrder =
-        transactionRepository.createWithInventory.mock.invocationCallOrder[0];
+        transactionRepository.create.mock.invocationCallOrder[0];
       expect(lockOrder).toBeLessThan(skuCheckOrder);
       expect(skuCheckOrder).toBeLessThan(insertOrder);
     });
 
-    it('inserts the mapped product with its initial stock and creator', async () => {
+    it('inserts the mapped product', async () => {
       await service.create(createDto, 1);
 
-      expect(transactionRepository.createWithInventory).toHaveBeenCalledWith(
-        {
-          name: 'Mechanical Keyboard',
-          slug: 'mechanical-keyboard',
-          sku: 'MK-001',
-          description: null,
-          price: '89.90',
-          categoryId: 3,
-          isActive: true,
-        },
+      expect(transactionRepository.create).toHaveBeenCalledWith({
+        name: 'Mechanical Keyboard',
+        slug: 'mechanical-keyboard',
+        sku: 'MK-001',
+        description: null,
+        price: '89.90',
+        categoryId: 3,
+        isActive: true,
+      });
+    });
+
+    it('initializes stock for the new product in the same transaction', async () => {
+      await service.create(createDto, 1);
+
+      expect(inventoryService.initializeStock).toHaveBeenCalledWith(
+        manager,
+        7,
         25,
         1,
       );
@@ -122,22 +138,23 @@ describe('ProductsWriteService', () => {
     it('defaults the initial stock to 0', async () => {
       await service.create({ name: 'Mug', sku: 'MUG-1', price: 5 }, 1);
 
-      expect(transactionRepository.createWithInventory).toHaveBeenCalledWith(
-        expect.anything(),
+      expect(inventoryService.initializeStock).toHaveBeenCalledWith(
+        manager,
+        7,
         0,
         1,
       );
     });
 
-    it('invalidates the cache after the transaction and returns the saved product', async () => {
+    it('returns the product read inside the transaction and invalidates the cache after it', async () => {
       const result = await service.create(createDto, 1);
 
+      expect(transactionRepository.getById).toHaveBeenCalledWith(7);
+      expect(result).toMatchObject({ id: 7, category: null, stock: 25 });
       expect(cache.invalidate).toHaveBeenCalledTimes(1);
-      expect(repository.transaction.mock.invocationCallOrder[0]).toBeLessThan(
-        cache.invalidate.mock.invocationCallOrder[0],
-      );
-      expect(readService.findById).toHaveBeenCalledWith(7);
-      expect(result).toBe(savedProduct);
+      expect(
+        transactionRepository.getById.mock.invocationCallOrder[0],
+      ).toBeLessThan(cache.invalidate.mock.invocationCallOrder[0]);
     });
 
     it('checks the category before opening a transaction', async () => {
@@ -157,7 +174,8 @@ describe('ProductsWriteService', () => {
       await expect(service.create(createDto, 1)).rejects.toThrow(
         ConflictException,
       );
-      expect(transactionRepository.createWithInventory).not.toHaveBeenCalled();
+      expect(transactionRepository.create).not.toHaveBeenCalled();
+      expect(inventoryService.initializeStock).not.toHaveBeenCalled();
       expect(cache.invalidate).not.toHaveBeenCalled();
     });
   });
@@ -211,12 +229,14 @@ describe('ProductsWriteService', () => {
       );
     });
 
-    it('invalidates the cache and returns the updated product', async () => {
+    it('returns the product read after the update and invalidates the cache', async () => {
       const result = await service.update(7, { name: 'Renamed' });
 
+      expect(
+        transactionRepository.update.mock.invocationCallOrder[0],
+      ).toBeLessThan(transactionRepository.getById.mock.invocationCallOrder[0]);
+      expect(result).toMatchObject({ id: 7, stock: 25 });
       expect(cache.invalidate).toHaveBeenCalledTimes(1);
-      expect(readService.findById).toHaveBeenCalledWith(7);
-      expect(result).toBe(savedProduct);
     });
   });
 });
