@@ -42,6 +42,7 @@ import { ProductsModule } from './products/products.module.js';
         connection: {
           host: config.get('REDIS_HOST'),
           port: config.get('REDIS_PORT'),
+          db: config.get('REDIS_DB'),
           enableOfflineQueue: false,
           maxRetriesPerRequest: null,
         },

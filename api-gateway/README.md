@@ -30,6 +30,9 @@ npm run format    # prettier
 ## Test
 
 ```bash
-npm test          # unit tests
-npm run test:cov  # coverage
+npm test                  # unit tests (no Docker needed)
+npm run test:cov          # unit test coverage
+npm run test:integration  # integration tests (needs Docker running)
 ```
+
+Integration tests use [Testcontainers](https://testcontainers.com/): each run starts its own throwaway `postgres:16-alpine` and `redis:7-alpine` containers (the same images as `docker-compose.yml`), runs the migrations, boots the real app over HTTP with the real Redis event listener, and removes the containers afterwards. Your `docker compose` services and dev data are never touched, and the compose stack does not need to be running. Only outgoing email is faked. Tables and Redis are wiped before every test.

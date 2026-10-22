@@ -10,6 +10,7 @@ export function createRedisClient(
   const redis = new Redis({
     host: config.get('REDIS_HOST'),
     port: config.get('REDIS_PORT'),
+    db: config.get('REDIS_DB'),
     enableOfflineQueue: false,
     maxRetriesPerRequest: 1,
     commandTimeout: 500,

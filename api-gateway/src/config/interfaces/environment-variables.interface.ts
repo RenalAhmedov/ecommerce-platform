@@ -11,6 +11,7 @@ export interface EnvironmentVariables {
   JWT_EXPIRES_IN: number;
   REDIS_HOST: string;
   REDIS_PORT: number;
+  REDIS_DB: number;
   CACHE_TTL_SECONDS: number;
   MAIL_HOST: string;
   MAIL_PORT: number;

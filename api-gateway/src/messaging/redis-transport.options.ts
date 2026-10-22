@@ -8,6 +8,7 @@ export function createRedisTransportOptions(
   return {
     host: config.get('REDIS_HOST'),
     port: config.get('REDIS_PORT'),
+    db: config.get('REDIS_DB'),
     retryAttempts: Number.MAX_SAFE_INTEGER,
     retryDelay: 2_000,
   };

@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import type { DataSourceOptions } from 'typeorm';
 import type { EnvironmentVariables } from '../config/interfaces/environment-variables.interface.js';
+import { ENTITIES } from './entities.js';
 
 type DatabaseEnv = Pick<
   EnvironmentVariables,
@@ -20,7 +21,7 @@ export function createDataSourceOptions(env: DatabaseEnv): DataSourceOptions {
     database: env.DB_DATABASE,
     username: env.DB_USERNAME,
     password: env.DB_PASSWORD,
-    entities: [join(import.meta.dirname, '..', '**', '*.entity.js')],
+    entities: ENTITIES,
     migrations: [join(import.meta.dirname, 'migrations', '*.js')],
     parseInt8: true,
     synchronize: false,
