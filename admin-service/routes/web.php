@@ -2,7 +2,9 @@
 
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProductExportController;
 use App\Http\Controllers\ProductImageController;
+use App\Http\Controllers\ProductImportController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/dashboard');
@@ -10,6 +12,13 @@ Route::redirect('/', '/dashboard');
 Route::middleware(['auth', 'admin'])->group(function () {
     Route::view('/dashboard', 'dashboard')->name('dashboard');
     Route::view('/profile', 'profile.edit')->name('profile.edit');
+
+    // Fixed paths are registered before products/{product} so "export" is never read as an id.
+    Route::get('products/export', ProductExportController::class)->name('products.export');
+    Route::get('products/import', [ProductImportController::class, 'index'])->name('products.import.index');
+    Route::post('products/import', [ProductImportController::class, 'store'])
+        ->middleware('throttle:10,1')
+        ->name('products.import.store');
 
     Route::resource('products', ProductController::class)->except('show');
     Route::patch('products/{product}/restore', [ProductController::class, 'restore'])

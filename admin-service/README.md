@@ -47,7 +47,7 @@ Both services share one PostgreSQL database, so table ownership is explicit:
 | Tables | Owned by | Migrations |
 |---|---|---|
 | users, categories, products, inventories, orders, order_items, inventory_movements | shared (created by the Nest.js `api-gateway`) | `database/migrations/shared/` – an exact Laravel copy of the schema, **not** run by `php artisan migrate` |
-| password_reset_tokens, failed_jobs | Laravel | `database/migrations/` – run by `php artisan migrate` |
+| password_reset_tokens, failed_jobs, product_imports | Laravel | `database/migrations/` – run by `php artisan migrate` |
 
 Laravel records its migrations in `laravel_migrations` (TypeORM uses `migrations`), so the two histories never collide.
 
@@ -86,6 +86,18 @@ curl -H "Authorization: Bearer $TOKEN" -H "Accept: application/json" "http://loc
 Responses use the Nest field names (`isActive`, `imagePath`, `stock`, …) and list pages return `{ data, meta: { page, limit, total, totalPages } }`.
 
 How a token is checked (`App\Services\JwtAuthService`): HS256 signature with `JWT_SECRET` (must equal the api-gateway's), not expired, has `sub` and `jti`, not revoked — the Nest logout key `auth:revoked-token:<jti>` is read from Redis without the `admin:` prefix (fails open if Redis is down, like Nest) — and the user still exists. The **admin role is read from the database**, not from the token, so a demoted admin loses access immediately (403). Rate limit: 120 requests/minute per user.
+
+## Import and export
+
+**Export** (`Products › Export CSV`) downloads the products the list currently shows (same search/category/status filters). It is streamed row by row, so its size doesn't matter. Cells starting with `= + - @` get a leading `'` so spreadsheet apps don't run them as formulas (CSV injection).
+
+**Import** (`Products › Import`) takes the same format — columns `sku, name, slug, description, price, category_slug, is_active, stock` (only `sku, name, price` required), up to 2000 rows per file. The upload is stored, recorded in the `product_imports` table (owned by this service) and processed by the queue worker; the page refreshes until the import is done and lists every rejected row with its row number and reason.
+
+- rows are matched by SKU: a new SKU creates the product with `stock` as opening stock, an existing SKU is updated (its stock is left alone, it only changes through stock movements);
+- every row goes through `ProductService`, so it gets the same validation (`App\Validation\ProductRules`, also used by the forms and API), advisory locks and uniqueness rules as the forms;
+- a bad row doesn't stop the import; importing the same file twice creates nothing new, and a job delivered twice runs only once (the import is claimed atomically: `queued → processing`).
+
+An exported file can be edited in a spreadsheet and imported straight back.
 
 ## Categories
 

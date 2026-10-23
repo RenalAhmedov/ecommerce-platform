@@ -32,7 +32,7 @@ class ProductService
     }
 
     /** @param  array<string, mixed>  $data */
-    public function create(array $data, User $admin): Product
+    public function create(array $data, ?User $admin): Product
     {
         return DB::transaction(function () use ($data, $admin) {
             $this->products->lockUniqueValues($data['sku'], $data['slug']);

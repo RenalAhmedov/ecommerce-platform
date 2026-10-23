@@ -25,6 +25,12 @@ class CategoryRepository
             ->get();
     }
 
+    /** @return array<string, int> slug => id of active categories */
+    public function idsBySlug(): array
+    {
+        return Category::pluck('id', 'slug')->all();
+    }
+
     public function lockTree(): void
     {
         AdvisoryLock::acquire([AdvisoryLock::categoryTree()]);

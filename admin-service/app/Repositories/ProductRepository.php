@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Support\AdvisoryLock;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\LazyCollection;
 
 class ProductRepository
 {
@@ -16,21 +17,27 @@ class ProductRepository
      */
     public function paginate(array $filters, int $perPage): LengthAwarePaginator
     {
-        return Product::query()
-            ->with(['category', 'inventory'])
-            ->when($filters['search'] ?? null, function (Builder $query, string $search) {
-                $pattern = '%'.addcslashes($search, '\\%_').'%';
-                $query->where(fn (Builder $query) => $query->whereLike('name', $pattern)->orWhereLike('sku', $pattern));
-            })
-            ->when($filters['category_id'] ?? null, fn (Builder $query, $categoryId) => $query->where('category_id', (int) $categoryId))
-            ->when($filters['status'] ?? null, fn (Builder $query, string $status) => match (ProductStatusFilter::from($status)) {
-                ProductStatusFilter::Active => $query->where('is_active', true),
-                ProductStatusFilter::Inactive => $query->where('is_active', false),
-                ProductStatusFilter::Trashed => $query->onlyTrashed(),
-            })
+        return $this->filtered($filters)
             ->latest('id')
             ->paginate($perPage)
             ->withQueryString();
+    }
+
+    /**
+     * Streams the filtered products in chunks of 500, so an export of any size
+     * uses constant memory.
+     *
+     * @param  array{search?: ?string, category_id?: int|string|null, status?: ?string}  $filters
+     * @return LazyCollection<int, Product>
+     */
+    public function lazyFiltered(array $filters): LazyCollection
+    {
+        return $this->filtered($filters)->lazyById(500);
+    }
+
+    public function findBySkuWithTrashed(string $sku): ?Product
+    {
+        return Product::withTrashed()->where('sku', $sku)->first();
     }
 
     public function loadDetails(Product $product): Product
@@ -94,6 +101,26 @@ class ProductRepository
     public function restore(Product $product): void
     {
         $product->restore();
+    }
+
+    /**
+     * @param  array{search?: ?string, category_id?: int|string|null, status?: ?string}  $filters
+     * @return Builder<Product>
+     */
+    private function filtered(array $filters): Builder
+    {
+        return Product::query()
+            ->with(['category', 'inventory'])
+            ->when($filters['search'] ?? null, function (Builder $query, string $search) {
+                $pattern = '%'.addcslashes($search, '\\%_').'%';
+                $query->where(fn (Builder $query) => $query->whereLike('name', $pattern)->orWhereLike('sku', $pattern));
+            })
+            ->when($filters['category_id'] ?? null, fn (Builder $query, $categoryId) => $query->where('category_id', (int) $categoryId))
+            ->when($filters['status'] ?? null, fn (Builder $query, string $status) => match (ProductStatusFilter::from($status)) {
+                ProductStatusFilter::Active => $query->where('is_active', true),
+                ProductStatusFilter::Inactive => $query->where('is_active', false),
+                ProductStatusFilter::Trashed => $query->onlyTrashed(),
+            });
     }
 
     private function existsBy(string $column, string $value, ?int $ignoreId): bool

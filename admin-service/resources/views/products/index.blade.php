@@ -2,9 +2,13 @@
     <x-slot name="header">
         <div class="flex items-center justify-between">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">{{ __('Products') }}</h2>
-            <a href="{{ route('products.create') }}" class="inline-flex items-center px-4 py-2 bg-gray-800 rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700">
-                {{ __('New product') }}
-            </a>
+            <div class="flex items-center gap-4">
+                <a href="{{ route('products.export', request()->only('search', 'category_id', 'status')) }}" class="text-sm text-indigo-600 hover:underline">{{ __('Export CSV') }}</a>
+                <a href="{{ route('products.import.index') }}" class="text-sm text-indigo-600 hover:underline">{{ __('Import') }}</a>
+                <a href="{{ route('products.create') }}" class="inline-flex items-center px-4 py-2 bg-gray-800 rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700">
+                    {{ __('New product') }}
+                </a>
+            </div>
         </div>
     </x-slot>
 
