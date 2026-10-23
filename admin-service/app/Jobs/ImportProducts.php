@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Services\ProductImportService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class ImportProducts implements ShouldQueue
@@ -26,6 +27,8 @@ class ImportProducts implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
+        Log::error('Product import failed', ['import_id' => $this->importId, 'error' => $exception?->getMessage()]);
+
         app(ProductImportService::class)->fail($this->importId, 'The import stopped unexpectedly. Rows before the failure were saved; fix the file and import it again.');
     }
 }

@@ -4,14 +4,12 @@ namespace Tests\Unit\Services;
 
 use App\Enums\ImportStatus;
 use App\Jobs\ImportProducts;
-use App\Models\Product;
 use App\Models\ProductImport;
 use App\Models\User;
-use App\Repositories\CategoryRepository;
 use App\Repositories\ProductImportRepository;
-use App\Repositories\ProductRepository;
+use App\Services\CategoryService;
 use App\Services\ProductImportService;
-use App\Services\ProductService;
+use App\Services\ProductRowImporter;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Validation\ValidationException;
@@ -24,11 +22,9 @@ class ProductImportServiceTest extends UnitTestCase
 
     private ProductImportRepository&MockInterface $imports;
 
-    private ProductRepository&MockInterface $products;
+    private ProductRowImporter&MockInterface $rows;
 
-    private CategoryRepository&MockInterface $categories;
-
-    private ProductService&MockInterface $productService;
+    private CategoryService&MockInterface $categories;
 
     private ProductImportService $service;
 
@@ -42,9 +38,8 @@ class ProductImportServiceTest extends UnitTestCase
         parent::setUp();
 
         $this->imports = $this->mock(ProductImportRepository::class);
-        $this->products = $this->mock(ProductRepository::class);
-        $this->categories = $this->mock(CategoryRepository::class);
-        $this->productService = $this->mock(ProductService::class);
+        $this->rows = $this->mock(ProductRowImporter::class);
+        $this->categories = $this->mock(CategoryService::class);
         $this->service = app(ProductImportService::class);
         $this->admin = User::factory()->admin()->make(['id' => 1]);
     }
@@ -76,7 +71,7 @@ class ProductImportServiceTest extends UnitTestCase
         $this->imports->shouldReceive('filePath')->with($import)->andReturn($path);
         $this->imports->shouldReceive('save')->with($import);
         $this->imports->shouldReceive('deleteFile')->once()->with($import);
-        $this->categories->shouldReceive('idsBySlug')->andReturn([]);
+        $this->categories->shouldReceive('idsBySlug')->once()->andReturn(['lamps' => 3]);
 
         return $import;
     }
@@ -114,52 +109,24 @@ class ProductImportServiceTest extends UnitTestCase
         $this->imports->shouldReceive('findWithUser')->andReturn(new ProductImport);
         $this->imports->shouldReceive('claim')->with(7)->andReturnFalse();
         $this->imports->shouldNotReceive('filePath');
-        $this->productService->shouldNotReceive('create', 'update');
+        $this->rows->shouldNotReceive('import');
 
         $this->service->process(7);
     }
 
-    public function test_new_skus_are_created_and_known_skus_updated(): void
+    public function test_every_row_is_imported_and_counted_and_bad_rows_are_reported(): void
     {
-        $import = $this->queuedImport($this->csvFile([
-            'lamp-1,Desk Lamp,,Bright,49.90,,yes,7',
-            'MUG-1,Renamed Mug,,,6.00,,0,999',
-        ]));
-        $existing = Product::factory()->make(['id' => 3, 'sku' => 'MUG-1']);
-        $this->products->shouldReceive('findBySkuWithTrashed')->with('LAMP-1')->andReturnNull();
-        $this->products->shouldReceive('findBySkuWithTrashed')->with('MUG-1')->andReturn($existing);
-
-        $this->productService->shouldReceive('create')->once()->with([
-            'sku' => 'LAMP-1', 'name' => 'Desk Lamp', 'slug' => 'desk-lamp', 'price' => '49.90',
-            'description' => 'Bright', 'category_id' => null, 'is_active' => true, 'initial_stock' => '7',
-        ], $this->admin);
-        $this->productService->shouldReceive('update')->once()->with($existing, [
-            'sku' => 'MUG-1', 'name' => 'Renamed Mug', 'price' => '6.00', 'description' => null, 'category_id' => null, 'is_active' => false,
-        ]);
+        $import = $this->queuedImport($this->csvFile(['NEW-1,New,,,1,,,', 'OLD-1,Old,,,1,,,', 'BAD-1,Bad,,,-1,,,']));
+        $this->rows->shouldReceive('import')->times(3)->andReturnUsing(fn (array $row) => match ($row['sku']) {
+            'NEW-1' => true,
+            'OLD-1' => false,
+            'BAD-1' => throw ValidationException::withMessages(['price' => 'The price field must be at least 0.']),
+        });
 
         $this->service->process(7);
 
-        $this->assertSame([ImportStatus::Completed, 2, 1, 1, 0, []], [$import->status, $import->processed_rows, $import->created_count, $import->updated_count, $import->failed_count, $import->errors]);
-    }
-
-    public function test_bad_rows_are_reported_with_their_row_number_and_do_not_stop_the_import(): void
-    {
-        $import = $this->queuedImport($this->csvFile([
-            'bad sku,Bad,,,-5,,,',
-            'OK-2,Unknown category,,,1,nope,,',
-            'GONE-1,Deleted,,,1,,,',
-            'OK-3,Fine,,,2,,,',
-        ]));
-        $this->products->shouldReceive('findBySkuWithTrashed')->with('BAD SKU')->andReturnNull();
-        $this->products->shouldReceive('findBySkuWithTrashed')->with('GONE-1')->andReturn(tap(Product::factory()->make(['id' => 9]))->setAttribute('deleted_at', now()));
-        $this->products->shouldReceive('findBySkuWithTrashed')->with('OK-3')->andReturnNull();
-        $this->productService->shouldReceive('create')->once();
-
-        $this->service->process(7);
-
-        $this->assertSame([4, 1, 0, 3], [$import->processed_rows, $import->created_count, $import->updated_count, $import->failed_count]);
-        $this->assertSame([2, 3, 4], array_column($import->errors, 'row'));
-        $this->assertSame(['Unknown category "nope".'], $import->errors[1]['messages']);
-        $this->assertSame(['This SKU belongs to a deleted product. Restore it first.'], $import->errors[2]['messages']);
+        $this->assertSame([ImportStatus::Completed, 3, 1, 1, 1], [$import->status, $import->processed_rows, $import->created_count, $import->updated_count, $import->failed_count]);
+        $this->assertSame([['row' => 4, 'sku' => 'BAD-1', 'messages' => ['The price field must be at least 0.']]], $import->errors);
+        $this->assertNotNull($import->finished_at);
     }
 }

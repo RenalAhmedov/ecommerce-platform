@@ -9,6 +9,7 @@ use App\Repositories\ProductRepository;
 use App\Support\ImageResizer;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Intervention\Image\Exceptions\ImageException;
 
 class ProductImageService
@@ -30,6 +31,8 @@ class ProductImageService
         $this->images->markPending($product->id, $uploadPath);
 
         ProcessProductImage::dispatch($product->id, $uploadPath);
+
+        Log::info('Product image upload queued', ['product_id' => $product->id, 'upload' => $uploadPath]);
     }
 
     public function isProcessing(Product $product): bool
@@ -50,6 +53,7 @@ class ProductImageService
 
         if ($original === null || ! $this->isNewestUpload($productId, $uploadPath)) {
             $this->images->deleteUpload($uploadPath);
+            Log::info('Product image upload skipped: replaced by a newer upload or already removed', ['product_id' => $productId, 'upload' => $uploadPath]);
 
             return;
         }
@@ -79,6 +83,11 @@ class ProductImageService
             $this->images->deleteImage($obsoletePath);
         }
         $this->images->deleteUpload($uploadPath);
+
+        Log::info($obsoletePath === $newPath ? 'Product image discarded: product gone or a newer upload won' : 'Product image processed', [
+            'product_id' => $productId,
+            'image' => $newPath,
+        ]);
     }
 
     /** Also cancels an upload that is still queued, so it can't bring the image back. */
@@ -99,6 +108,8 @@ class ProductImageService
             $this->images->deleteImage($previousPath);
         }
 
+        Log::info('Product image removed', ['product_id' => $product->id]);
+
         return $product;
     }
 
@@ -109,6 +120,8 @@ class ProductImageService
             $this->images->clearPending($productId);
         }
         $this->images->deleteUpload($uploadPath);
+
+        Log::warning('Product image upload discarded after failing', ['product_id' => $productId, 'upload' => $uploadPath]);
     }
 
     private function isNewestUpload(int $productId, string $uploadPath): bool

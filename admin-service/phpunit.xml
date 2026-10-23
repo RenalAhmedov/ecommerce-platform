@@ -35,6 +35,7 @@
         <env name="REDIS_HOST" value="testcontainers-not-started" force="true"/>
         <env name="REDIS_PORT" value="6379" force="true"/>
         <env name="JWT_SECRET" value="test-secret-for-phpunit-only-0123456789"/>
+        <env name="LOG_CHANNEL" value="null"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

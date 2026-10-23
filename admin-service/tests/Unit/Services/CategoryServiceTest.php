@@ -182,4 +182,22 @@ class CategoryServiceTest extends UnitTestCase
 
         $this->service->restore($laptops);
     }
+
+    public function test_the_full_option_list_is_cached_until_a_category_changes(): void
+    {
+        $this->categories->shouldReceive('allActive')->twice()->andReturn(
+            new Collection([$this->category(1, 'Books')]),
+            new Collection([$this->category(1, 'Books'), $this->category(2, 'Toys')]),
+        );
+        $this->categories->shouldReceive('lockTree');
+        $this->categories->shouldReceive('existsBySlug')->andReturnFalse();
+        $this->categories->shouldReceive('create')->andReturn($this->category(2, 'Toys'));
+
+        $this->assertSame([1 => 'Books'], $this->service->options());
+        $this->assertSame([1 => 'Books'], $this->service->options(), 'served from the cache');
+
+        $this->service->create(['name' => 'Toys', 'slug' => 'toys']);
+
+        $this->assertSame([1 => 'Books', 2 => 'Toys'], $this->service->options());
+    }
 }

@@ -4,13 +4,28 @@ namespace App\Services;
 
 use App\Models\Category;
 use App\Repositories\CategoryRepository;
+use Illuminate\Contracts\Cache\Repository as Cache;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
+/**
+ * The category tree. Only this service writes categories (the Nest API only
+ * reads them), so the dropdown options are cached in Redis and cleared by
+ * every write here, after its transaction has committed.
+ */
 class CategoryService
 {
-    public function __construct(private readonly CategoryRepository $categories) {}
+    private const OPTIONS_CACHE_KEY = 'categories:options';
+
+    /** Safety net in case a read races a write; normally the entry is cleared by the write. */
+    private const OPTIONS_CACHE_SECONDS = 3600;
+
+    public function __construct(
+        private readonly CategoryRepository $categories,
+        private readonly Cache $cache,
+    ) {}
 
     /**
      * Active categories in tree order (each parent followed by its children,
@@ -41,12 +56,26 @@ class CategoryService
         return $rows;
     }
 
-    /** @return array<int, string> id => indented name, for select inputs */
+    /**
+     * id => indented name, for select inputs. The full list (used on every
+     * product page) is cached; the list without a subtree (only on the
+     * category edit page) is built fresh.
+     *
+     * @return array<int, string>
+     */
     public function options(?int $withoutSubtreeOf = null): array
     {
-        return collect($this->tree($withoutSubtreeOf))
-            ->mapWithKeys(fn (array $row) => [$row['category']->id => str_repeat('— ', $row['depth']).$row['category']->name])
-            ->all();
+        if ($withoutSubtreeOf !== null) {
+            return $this->buildOptions($withoutSubtreeOf);
+        }
+
+        return $this->cache->remember(self::OPTIONS_CACHE_KEY, self::OPTIONS_CACHE_SECONDS, fn () => $this->buildOptions(null));
+    }
+
+    /** @return array<string, int> slug => id of active categories, for imports */
+    public function idsBySlug(): array
+    {
+        return $this->categories->idsBySlug();
     }
 
     /** @return Collection<int, Category> */
@@ -58,18 +87,23 @@ class CategoryService
     /** @param  array<string, mixed>  $data */
     public function create(array $data): Category
     {
-        return DB::transaction(function () use ($data) {
+        $category = DB::transaction(function () use ($data) {
             $this->categories->lockTree();
             $this->ensureSlugAvailable($data['slug']);
 
             return $this->categories->create($data);
         });
+        $this->forgetOptions();
+
+        Log::info('Category created', ['category_id' => $category->id, 'slug' => $category->slug, 'parent_id' => $category->parent_id]);
+
+        return $category;
     }
 
     /** @param  array<string, mixed>  $data */
     public function update(Category $category, array $data): Category
     {
-        return DB::transaction(function () use ($category, $data) {
+        $changed = DB::transaction(function () use ($category, $data) {
             $this->categories->lockTree();
             $category->fill($data);
 
@@ -80,10 +114,18 @@ class CategoryService
                 $this->ensureValidParent($category, $category->parent_id);
             }
 
+            $changed = array_keys($category->getDirty());
             $this->categories->save($category);
 
-            return $category;
+            return $changed;
         });
+        $this->forgetOptions();
+
+        if ($changed !== []) {
+            Log::info('Category updated', ['category_id' => $category->id, 'changed' => $changed]);
+        }
+
+        return $category;
     }
 
     /**
@@ -103,6 +145,9 @@ class CategoryService
 
             $this->categories->delete($category);
         });
+        $this->forgetOptions();
+
+        Log::info('Category moved to trash', ['category_id' => $category->id, 'slug' => $category->slug]);
     }
 
     public function restore(Category $category): void
@@ -118,6 +163,22 @@ class CategoryService
 
             $this->categories->restore($category);
         });
+        $this->forgetOptions();
+
+        Log::info('Category restored', ['category_id' => $category->id, 'slug' => $category->slug]);
+    }
+
+    /** @return array<int, string> */
+    private function buildOptions(?int $withoutSubtreeOf): array
+    {
+        return collect($this->tree($withoutSubtreeOf))
+            ->mapWithKeys(fn (array $row) => [$row['category']->id => str_repeat('— ', $row['depth']).$row['category']->name])
+            ->all();
+    }
+
+    private function forgetOptions(): void
+    {
+        $this->cache->forget(self::OPTIONS_CACHE_KEY);
     }
 
     /** @throws ValidationException */

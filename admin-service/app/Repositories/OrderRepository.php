@@ -4,6 +4,7 @@ namespace App\Repositories;
 
 use App\Enums\OrderStatus;
 use App\Models\Order;
+use App\Support\LikePattern;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -22,7 +23,7 @@ class OrderRepository
             ->with(['user' => fn ($query) => $query->withTrashed()])
             ->withCount('items')
             ->when($filters['search'] ?? null, function (Builder $query, string $search) {
-                $pattern = '%'.addcslashes($search, '\\%_').'%';
+                $pattern = LikePattern::contains($search);
                 $query->where(fn (Builder $query) => $query
                     ->whereLike('order_number', $pattern)
                     ->orWhereHas('user', fn (Builder $user) => $user

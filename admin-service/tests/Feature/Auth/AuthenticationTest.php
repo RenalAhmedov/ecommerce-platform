@@ -87,4 +87,13 @@ class AuthenticationTest extends FeatureTestCase
         $this->assertGuest();
         $response->assertRedirect(route('login', absolute: false));
     }
+
+    public function test_one_ip_cannot_try_many_accounts(): void
+    {
+        foreach (range(1, 20) as $attempt) {
+            $this->post('/login', ['email' => "user{$attempt}@example.test", 'password' => 'wrong-password'])->assertRedirect();
+        }
+
+        $this->post('/login', ['email' => 'user21@example.test', 'password' => 'wrong-password'])->assertTooManyRequests();
+    }
 }

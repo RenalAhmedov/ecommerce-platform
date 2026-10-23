@@ -5,6 +5,7 @@ namespace App\Repositories;
 use App\Enums\UserRole;
 use App\Models\User;
 use App\Support\AdvisoryLock;
+use App\Support\LikePattern;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -20,7 +21,7 @@ class UserRepository
             ->withCount('orders')
             ->when(filter_var($filters['trashed'] ?? false, FILTER_VALIDATE_BOOLEAN), fn (Builder $query) => $query->onlyTrashed())
             ->when($filters['search'] ?? null, function (Builder $query, string $search) {
-                $pattern = '%'.addcslashes($search, '\\%_').'%';
+                $pattern = LikePattern::contains($search);
                 $query->where(fn (Builder $query) => $query->whereLike('name', $pattern)->orWhereLike('email', $pattern));
             })
             ->when($filters['role'] ?? null, fn (Builder $query, string $role) => $query->where('role', UserRole::from($role)))
@@ -89,11 +90,6 @@ class UserRepository
     public function restore(User $user): void
     {
         $user->restore();
-    }
-
-    public function updatePassword(User $user, string $password): void
-    {
-        $user->update(['password' => $password]);
     }
 
     public function updatePasswordAndRememberToken(User $user, string $password, string $rememberToken): void

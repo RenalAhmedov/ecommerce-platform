@@ -5,6 +5,7 @@ namespace App\Repositories;
 use App\Enums\ProductStatusFilter;
 use App\Models\Product;
 use App\Support\AdvisoryLock;
+use App\Support\LikePattern;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\LazyCollection;
@@ -112,7 +113,7 @@ class ProductRepository
         return Product::query()
             ->with(['category', 'inventory'])
             ->when($filters['search'] ?? null, function (Builder $query, string $search) {
-                $pattern = '%'.addcslashes($search, '\\%_').'%';
+                $pattern = LikePattern::contains($search);
                 $query->where(fn (Builder $query) => $query->whereLike('name', $pattern)->orWhereLike('sku', $pattern));
             })
             ->when($filters['category_id'] ?? null, fn (Builder $query, $categoryId) => $query->where('category_id', (int) $categoryId))

@@ -43,6 +43,9 @@ class JwtAuthService
         }
 
         if ($this->isRevoked($claims->jti)) {
+            // A logged-out token being reused can mean it was stolen.
+            Log::warning('Revoked access token used', ['jti' => $claims->jti, 'sub' => $claims->sub]);
+
             return null;
         }
 

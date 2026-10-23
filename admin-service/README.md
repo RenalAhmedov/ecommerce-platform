@@ -141,6 +141,7 @@ An exported file can be edited in a spreadsheet and imported straight back.
 
 Categories form a tree through `parent_id` (Electronics › Computers › Laptops) and are managed only by this service (the Nest API reads them). Rules enforced in `App\Services\CategoryService`:
 
+- the category dropdown used on every product page is cached in Redis and cleared by every category change (only this service writes categories);
 - a category cannot be moved under itself or any of its subcategories (checked with a recursive SQL query up the parent chain);
 - all category writes take one advisory lock (`categories.tree`), so two admins moving categories at the same moment can't create a loop, and slug checks can't race;
 - a category with subcategories cannot be deleted; its products keep their `category_id` and show as uncategorised until the category is restored;
@@ -165,7 +166,7 @@ Sessions, cache and queues use the shared Redis. Every Laravel key starts with `
 |---|---|---|
 | Sessions | 0 | `admin:<session id>` |
 | Queue (`default`) | 0 | `admin:queues:default` |
-| Cache (dashboard figures, image upload markers), login and API rate limiters | 1 | `admin:<cache key>` |
+| Cache (dashboard figures, category dropdown, image upload markers), login and API rate limiters | 1 | `admin:<cache key>` |
 | Nest keys Laravel reads (JWT revocation) | 0 | `auth:revoked-token:<jti>` — `shared` connection, no prefix |
 
 The cache lives in its own Redis database because `php artisan cache:clear` runs `FLUSHDB` on it: in database 0 it would also wipe the Nest queues and idempotency keys, and log every admin out.
@@ -180,6 +181,19 @@ docker compose exec admin-service php artisan queue:retry all  # retry
 
 Tests do not need Redis: `phpunit.xml` switches to the in-memory `array` cache/session and the `sync` queue.
 
+## Logs
+
+Logs go to stderr (`LOG_STACK=stderr`), so they appear in `docker compose logs -f admin-service admin-worker`.
+
+- **Every request** is logged once (`HTTP request`: method, path, status, duration, IP) and gets a **request id**, returned as the `X-Request-Id` header. A valid id sent by a proxy in front of the app is kept, so one request can be followed across services. The health check `/up` is not logged.
+- The request id — and, behind the `admin` middleware, the acting admin's `user_id` — is attached to **every log line** written while handling the request, including lines from queued jobs it dispatched (Laravel `Context`).
+- **Business events**: products, categories and users created / updated (which fields) / deleted / restored, order status changes (from → to, stock returned), imports queued / completed (counts) / failed, product images queued / processed / removed / discarded.
+- **Security events** (warning): failed admin logins, lockouts, revoked tokens being used again, non-admins reaching admin routes, and the token revocation check being skipped because Redis is down. Passwords and tokens are never logged.
+
+```
+local.INFO: Order status changed {"order_id":12,"order_number":"ORD-…","from":"paid","to":"cancelled","stock_returned":true} {"request_id":"bc13…","user_id":1}
+```
+
 ## Tests
 
 Two suites, like the Nest api-gateway's unit and integration tests:
@@ -187,7 +201,7 @@ Two suites, like the Nest api-gateway's unit and integration tests:
 | Suite | Folder | What it covers | Needs |
 |---|---|---|---|
 | **Unit** | `tests/Unit` | one service at a time with its repositories mocked (business rules, lock order, edge cases) | nothing — no database, Redis or Docker; any accidental database call fails the test |
-| **Integration** | `tests/Feature` (Laravel's name for them) | the real application over HTTP: routes, middleware, Form Requests, services, repositories, SQL, locks, queues, files | Docker: a throwaway `postgres:16-alpine` and `redis:7-alpine` are started with **Testcontainers** for the run and removed afterwards |
+| **Integration** | `tests/Feature` (Laravel's name for them), one folder per area (`Api`, `Auth`, `Products`, `Orders`, …) | the real application over HTTP: routes, middleware, Form Requests, services, repositories, SQL, locks, queues, files, logs | Docker: a throwaway `postgres:16-alpine` and `redis:7-alpine` are started with **Testcontainers** for the run and removed afterwards |
 
 ```bash
 docker compose run --rm admin-tests                                   # everything
@@ -198,7 +212,7 @@ docker compose run --rm admin-tests php artisan test --filter=OrderManagementTes
 
 `admin-tests` is a test-only service (compose profile `test`, never started by `docker compose up`). It is the only container that gets the Docker socket, so Testcontainers can start the throwaway databases; the running app and worker never get it. With PHP and Docker on the machine itself (as in CI) the same tests run with `composer test`, `composer test:unit` and `composer test:integration` and need no extra setup. Unit tests also run inside the app container (`docker compose exec admin-service composer test:unit`).
 
-The integration tests never touch the development database or Redis. The full schema (the shared tables plus this service's own) is built once per run in the throwaway Postgres, and every test runs in a transaction that is rolled back. `migrate:fresh`, `db:wipe` and similar commands stay blocked outside tests because they would drop the Nest service's tables in the shared database.
+The integration tests never touch the development database or Redis: `phpunit.xml` points the database and Redis at placeholder hosts before Laravel boots, and `FeatureTestCase` aborts the run before any migration unless Laravel is connected to the throwaway containers. The full schema (the shared tables plus this service's own) is built once per run in the throwaway Postgres, and every test runs in a transaction that is rolled back. `migrate:fresh`, `db:wipe` and similar commands stay blocked outside tests because they would drop the Nest service's tables in the shared database.
 
 If a run is killed half-way, its containers can be removed with:
 

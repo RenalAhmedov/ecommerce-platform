@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Feature;
+namespace Tests\Feature\Reports;
 
 use App\Enums\OrderStatus;
 use App\Enums\ReportPeriod;
@@ -12,6 +12,7 @@ use App\Services\ReportService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Carbon;
 use Illuminate\Testing\TestResponse;
+use Tests\Feature\FeatureTestCase;
 
 class ReportTest extends FeatureTestCase
 {

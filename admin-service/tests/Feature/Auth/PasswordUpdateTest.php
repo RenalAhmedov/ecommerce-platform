@@ -28,6 +28,19 @@ class PasswordUpdateTest extends FeatureTestCase
         $this->assertTrue(Hash::check('new-password', $admin->refresh()->password));
     }
 
+    public function test_a_new_password_signs_out_remembered_sessions_elsewhere(): void
+    {
+        $admin = User::factory()->admin()->create(['remember_token' => 'old-token']);
+
+        $this->actingAs($admin)->put('/password', [
+            'current_password' => 'password',
+            'password' => 'new-password',
+            'password_confirmation' => 'new-password',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertNotSame('old-token', $admin->refresh()->remember_token);
+    }
+
     public function test_correct_password_must_be_provided_to_update_password(): void
     {
         $admin = User::factory()->admin()->create();

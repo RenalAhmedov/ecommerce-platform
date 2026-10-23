@@ -168,4 +168,17 @@ class CategoryManagementTest extends FeatureTestCase
 
         $this->actingAs($this->admin)->get('/products/create')->assertSee('— — Laptops');
     }
+
+    public function test_the_category_dropdown_is_cached_and_refreshed_by_category_changes(): void
+    {
+        Category::factory()->create(['name' => 'Books']);
+        $this->actingAs($this->admin)->get('/products/create')->assertSee('Books');
+
+        // Written behind the service's back: the cached dropdown does not know it yet.
+        Category::factory()->create(['name' => 'Garden']);
+        $this->actingAs($this->admin)->get('/products/create')->assertDontSee('Garden');
+
+        $this->actingAs($this->admin)->post('/categories', ['name' => 'Toys'])->assertSessionHasNoErrors();
+        $this->actingAs($this->admin)->get('/products/create')->assertSee('Garden')->assertSee('Toys');
+    }
 }

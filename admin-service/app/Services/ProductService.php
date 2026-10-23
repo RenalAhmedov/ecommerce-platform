@@ -8,6 +8,7 @@ use App\Repositories\ProductRepository;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class ProductService
@@ -31,6 +32,12 @@ class ProductService
         return $this->products->loadDetails($product);
     }
 
+    /** Includes deleted products: their SKU stays reserved. */
+    public function findBySkuWithTrashed(string $sku): ?Product
+    {
+        return $this->products->findBySkuWithTrashed($sku);
+    }
+
     /** @param  array<string, mixed>  $data */
     public function create(array $data, ?User $admin): Product
     {
@@ -40,6 +47,8 @@ class ProductService
 
             $product = $this->products->create(Arr::except($data, 'initial_stock'));
             $this->inventory->initializeStock($product->id, $data['initial_stock'] ?? 0, $admin);
+
+            Log::info('Product created', ['product_id' => $product->id, 'sku' => $product->sku, 'initial_stock' => $data['initial_stock'] ?? 0]);
 
             return $product;
         });
@@ -58,7 +67,12 @@ class ProductService
             $this->products->lockUniqueValues($sku, $slug);
             $this->ensureAvailable($sku, $slug, ignoreId: $product->id);
 
+            $changed = array_keys($product->getDirty());
             $this->products->save($product);
+
+            if ($changed !== []) {
+                Log::info('Product updated', ['product_id' => $product->id, 'sku' => $product->sku, 'changed' => $changed]);
+            }
 
             return $product;
         });
@@ -67,11 +81,15 @@ class ProductService
     public function delete(Product $product): void
     {
         $this->products->delete($product);
+
+        Log::info('Product moved to trash', ['product_id' => $product->id, 'sku' => $product->sku]);
     }
 
     public function restore(Product $product): void
     {
         $this->products->restore($product);
+
+        Log::info('Product restored', ['product_id' => $product->id, 'sku' => $product->sku]);
     }
 
     /** @throws ValidationException */

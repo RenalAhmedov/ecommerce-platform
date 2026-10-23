@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Repositories\OrderRepository;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class OrderService
@@ -54,8 +55,17 @@ class OrderService
                 $this->inventory->release($this->orders->quantitiesByProduct($order), $order->id, $admin);
             }
 
+            $previous = $order->status;
             $order->status = $status;
             $this->orders->save($order);
+
+            Log::info('Order status changed', [
+                'order_id' => $order->id,
+                'order_number' => $order->order_number,
+                'from' => $previous->value,
+                'to' => $status->value,
+                'stock_returned' => $status === OrderStatus::Cancelled,
+            ]);
 
             return $order;
         });

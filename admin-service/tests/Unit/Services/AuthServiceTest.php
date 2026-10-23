@@ -28,6 +28,7 @@ class AuthServiceTest extends UnitTestCase
             ->once()
             ->with(['email' => 'ada@example.test', 'password' => 'secret', 'role' => 'admin'], true)
             ->andReturnTrue();
+        Auth::shouldReceive('guard->id')->andReturn(5);
 
         $this->service->login('ada@example.test', 'secret', true, '1.2.3.4');
     }

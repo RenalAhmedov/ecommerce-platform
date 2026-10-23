@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Services\ProductImageService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Log;
 use Intervention\Image\Exceptions\ImageException;
 use Throwable;
 
@@ -34,6 +35,8 @@ class ProcessProductImage implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
+        Log::error('Product image processing failed', ['product_id' => $this->productId, 'error' => $exception?->getMessage()]);
+
         app(ProductImageService::class)->discard($this->productId, $this->uploadPath);
     }
 }

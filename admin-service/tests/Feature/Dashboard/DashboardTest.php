@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Feature;
+namespace Tests\Feature\Dashboard;
 
 use App\Enums\OrderStatus;
 use App\Models\Inventory;
@@ -10,6 +10,7 @@ use App\Models\Product;
 use App\Models\User;
 use App\Services\DashboardService;
 use Illuminate\Support\Carbon;
+use Tests\Feature\FeatureTestCase;
 
 class DashboardTest extends FeatureTestCase
 {

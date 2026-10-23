@@ -9,6 +9,7 @@ use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -38,7 +39,11 @@ class UserService
             $this->users->lockEmail($data['email']);
             $this->ensureEmailAvailable($data['email']);
 
-            return $this->users->create(Arr::only($data, ['name', 'email', 'password']), UserRole::from($data['role']));
+            $user = $this->users->create(Arr::only($data, ['name', 'email', 'password']), UserRole::from($data['role']));
+
+            Log::info('User created', ['target_user_id' => $user->id, 'role' => $user->role->value]);
+
+            return $user;
         });
     }
 
@@ -72,7 +77,13 @@ class UserService
                 $user->role = $role;
             }
 
+            $changed = array_values(array_diff(array_keys($user->getDirty()), ['password', 'remember_token']));
+            $passwordChanged = $user->isDirty('password');
             $this->users->save($user);
+
+            if ($changed !== [] || $passwordChanged) {
+                Log::info('User updated', ['target_user_id' => $user->id, 'changed' => $changed, 'password_changed' => $passwordChanged]);
+            }
 
             return $user;
         });
@@ -89,6 +100,8 @@ class UserService
             }
 
             $this->users->delete($user);
+
+            Log::info('User deleted', ['target_user_id' => $user->id, 'role' => $user->role->value]);
         });
     }
 
@@ -96,19 +109,25 @@ class UserService
     public function restore(User $user): void
     {
         $this->users->restore($user);
+
+        Log::info('User restored', ['target_user_id' => $user->id]);
     }
 
+    /** Also renews the remember token, which signs out "remember me" sessions on other devices. */
     public function changePassword(User $user, string $password): void
     {
-        $this->users->updatePassword($user, $password);
+        $this->users->updatePasswordAndRememberToken($user, $password, Str::random(60));
+
+        Log::info('Password changed', ['target_user_id' => $user->id]);
     }
 
     /** A new remember token signs the user out of "remember me" sessions on other devices. */
     public function resetPassword(User $user, string $password): void
     {
         $this->users->updatePasswordAndRememberToken($user, $password, Str::random(60));
-
         event(new PasswordReset($user));
+
+        Log::info('Password reset completed', ['target_user_id' => $user->id]);
     }
 
     /** @throws ValidationException */
