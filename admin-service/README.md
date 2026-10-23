@@ -64,6 +64,28 @@ docker compose exec admin-service php artisan migrate
 
 Both frameworks produce an identical schema (verified by diffing `pg_dump --schema-only` of a database built by each).
 
+## Admin JSON API
+
+The same product management is available as JSON under **`/admin/api`** (`/api` is left to the Nest service for the Nginx routing). It uses the **access token issued by the Nest api-gateway** — one JWT for both services:
+
+```bash
+TOKEN=...   # from POST http://localhost:3000/api/auth/login as an admin
+curl -H "Authorization: Bearer $TOKEN" -H "Accept: application/json" "http://localhost:8000/admin/api/products?search=mug&limit=10"
+```
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/admin/api/products` | `search`, `category_id`, `status` (`active`/`inactive`/`trashed`), `page`, `limit` (≤ 100) |
+| GET | `/admin/api/products/{id}` | |
+| POST | `/admin/api/products` | `name`, `sku`, `price`, optional `slug`, `description`, `category_id`, `is_active`, `initial_stock` → 201 |
+| PUT/PATCH | `/admin/api/products/{id}` | partial update |
+| DELETE | `/admin/api/products/{id}` | soft delete → 204 |
+| PATCH | `/admin/api/products/{id}/restore` | |
+
+Responses use the Nest field names (`isActive`, `imagePath`, `stock`, …) and list pages return `{ data, meta: { page, limit, total, totalPages } }`.
+
+How a token is checked (`App\Services\JwtAuthService`): HS256 signature with `JWT_SECRET` (must equal the api-gateway's), not expired, has `sub` and `jti`, not revoked — the Nest logout key `auth:revoked-token:<jti>` is read from Redis without the `admin:` prefix (fails open if Redis is down, like Nest) — and the user still exists. The **admin role is read from the database**, not from the token, so a demoted admin loses access immediately (403). Rate limit: 120 requests/minute per user.
+
 ## Redis and the queue worker
 
 Sessions, cache and queues use the shared Redis. Every Laravel key starts with `admin:` (`REDIS_PREFIX`), so it never collides with the Nest service's keys (`bull:*`, `idempotency:*`, `products:*`, `auth:*`).
@@ -72,7 +94,8 @@ Sessions, cache and queues use the shared Redis. Every Laravel key starts with `
 |---|---|---|
 | Sessions | 0 | `admin:<session id>` |
 | Queue (`default`) | 0 | `admin:queues:default` |
-| Cache, login rate limiter | 1 | `admin:<cache key>` |
+| Cache, login and API rate limiters | 1 | `admin:<cache key>` |
+| Nest keys Laravel reads (JWT revocation) | 0 | `auth:revoked-token:<jti>` — `shared` connection, no prefix |
 
 The cache lives in its own Redis database because `php artisan cache:clear` runs `FLUSHDB` on it: in database 0 it would also wipe the Nest queues and idempotency keys, and log every admin out.
 

@@ -26,9 +26,9 @@ class ProductService
         return $this->products->paginate($filters, $perPage);
     }
 
-    public function withInventory(Product $product): Product
+    public function withDetails(Product $product): Product
     {
-        return $this->products->loadInventory($product);
+        return $this->products->loadDetails($product);
     }
 
     /** @param  array<string, mixed>  $data */

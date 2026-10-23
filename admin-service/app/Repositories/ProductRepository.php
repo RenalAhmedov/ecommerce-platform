@@ -33,9 +33,9 @@ class ProductRepository
             ->withQueryString();
     }
 
-    public function loadInventory(Product $product): Product
+    public function loadDetails(Product $product): Product
     {
-        return $product->loadMissing('inventory');
+        return $product->loadMissing(['category', 'inventory']);
     }
 
     /** Re-reads the row with SELECT … FOR UPDATE; must run inside a transaction. */

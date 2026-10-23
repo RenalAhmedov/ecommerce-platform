@@ -26,6 +26,7 @@
         <env name="DB_CONNECTION" value="pgsql"/>
         <env name="DB_DATABASE" value="ecommerce_admin_test"/>
         <env name="DB_URL" value=""/>
+        <env name="JWT_SECRET" value="test-secret-for-phpunit-only-0123456789"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

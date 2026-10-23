@@ -16,6 +16,8 @@ class ProductIndexRequest extends FormRequest
             'search' => ['nullable', 'string', 'max:100'],
             'category_id' => ['nullable', 'integer', 'min:1'],
             'status' => ['nullable', Rule::enum(ProductStatusFilter::class)],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
         ];
     }
 }

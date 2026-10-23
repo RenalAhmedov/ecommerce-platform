@@ -45,7 +45,7 @@ class ProductController extends Controller
     public function edit(Product $product): View
     {
         return view('products.edit', [
-            'product' => $this->products->withInventory($product),
+            'product' => $this->products->withDetails($product),
             'categories' => $this->categories->options(),
         ]);
     }
