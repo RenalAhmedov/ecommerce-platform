@@ -24,6 +24,14 @@
             @endisset
 
             <main>
+                @if (session('success'))
+                    <div class="max-w-7xl mx-auto pt-6 px-4 sm:px-6 lg:px-8">
+                        <div class="rounded-md bg-green-50 px-4 py-3 text-sm text-green-800" role="status">
+                            {{ session('success') }}
+                        </div>
+                    </div>
+                @endif
+
                 {{ $slot }}
             </main>
         </div>

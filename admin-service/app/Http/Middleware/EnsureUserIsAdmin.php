@@ -2,9 +2,9 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\AuthService;
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -13,13 +13,15 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class EnsureUserIsAdmin
 {
+    public function __construct(private readonly AuthService $auth) {}
+
     public function handle(Request $request, Closure $next): Response
     {
         if ($request->user()?->isAdmin()) {
             return $next($request);
         }
 
-        Auth::guard('web')->logout();
+        $this->auth->logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
