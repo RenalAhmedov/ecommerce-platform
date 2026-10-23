@@ -29,6 +29,14 @@ abstract class FeatureTestCase extends TestCase
         return $app;
     }
 
+    /** Pages are tested without the built CSS/JS, so tests don't need `npm run build` first. */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->withoutVite();
+    }
+
     /** @return array<string, mixed> */
     protected function migrateFreshUsing(): array
     {

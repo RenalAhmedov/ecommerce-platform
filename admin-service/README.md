@@ -24,11 +24,13 @@ docker compose up -d admin-service
 docker compose exec admin-service php artisan storage:link   # serves storage/app/public at /storage
 ```
 
-Build the CSS/JS (Tailwind + Alpine via Vite) whenever `resources/css`, `resources/js` or the Blade views change. Node runs in a throwaway container:
+Build the CSS/JS (Tailwind + Alpine via Vite) the first time and whenever `resources/css`, `resources/js` or the Blade views change. Node 24 runs in a container, so nothing needs to be installed:
 
 ```bash
-docker run --rm -v "$PWD/admin-service":/app -w /app node:24-alpine sh -c "npm ci && npm run build"
+docker compose run --rm admin-assets
 ```
+
+Its `node_modules` lives in a Docker volume (`admin-node-modules`), never in your folder, so building on the host as well (`cd admin-service && npm ci && npm run build`) keeps working side by side. The project's `.npmrc` pins the public npm registry, so a company-wide registry in your global npm config is not used for this project.
 
 ## Admin access
 
@@ -204,11 +206,14 @@ Two suites, like the Nest api-gateway's unit and integration tests:
 | **Integration** | `tests/Feature` (Laravel's name for them), one folder per area (`Api`, `Auth`, `Products`, `Orders`, …) | the real application over HTTP: routes, middleware, Form Requests, services, repositories, SQL, locks, queues, files, logs | Docker: a throwaway `postgres:16-alpine` and `redis:7-alpine` are started with **Testcontainers** for the run and removed afterwards |
 
 ```bash
-docker compose run --rm admin-tests                                   # everything
-docker compose run --rm admin-tests php artisan test --testsuite=Unit
-docker compose run --rm admin-tests php artisan test --testsuite=Feature
-docker compose run --rm admin-tests php artisan test --filter=OrderManagementTest
+docker compose run --rm admin-tests                                # everything (~1 min)
+docker compose run --rm admin-tests --testsuite=Unit               # unit tests only (~15 s)
+docker compose run --rm admin-tests --testsuite=Feature            # integration tests only
+docker compose run --rm admin-tests --filter=OrderManagementTest   # one class or test
+docker compose run --rm admin-tests tests/Feature/Api              # one folder
 ```
+
+Anything after `admin-tests` is passed to `php artisan test`. Only Docker is needed, even on a fresh clone: the runner creates `.env` from `.env.example` if it is missing and runs `composer install` before the tests (about a second when nothing changed). The tests need no built CSS/JS and no app key of their own (`phpunit.xml` has a test-only one), and they don't need the app containers to be running.
 
 `admin-tests` is a test-only service (compose profile `test`, never started by `docker compose up`). It is the only container that gets the Docker socket, so Testcontainers can start the throwaway databases; the running app and worker never get it. With PHP and Docker on the machine itself (as in CI) the same tests run with `composer test`, `composer test:unit` and `composer test:integration` and need no extra setup. Unit tests also run inside the app container (`docker compose exec admin-service composer test:unit`).
 
