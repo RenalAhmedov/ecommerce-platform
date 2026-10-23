@@ -12,9 +12,9 @@ use App\Models\Product;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Testing\TestResponse;
-use Tests\TestCase;
+use Tests\Feature\FeatureTestCase;
 
-class OrderManagementTest extends TestCase
+class OrderManagementTest extends FeatureTestCase
 {
     private User $admin;
 

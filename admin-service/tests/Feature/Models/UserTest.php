@@ -8,9 +8,9 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\MassAssignmentException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Tests\TestCase;
+use Tests\Feature\FeatureTestCase;
 
-class UserTest extends TestCase
+class UserTest extends FeatureTestCase
 {
     public function test_new_users_are_customers_by_default(): void
     {

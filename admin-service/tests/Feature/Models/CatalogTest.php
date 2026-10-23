@@ -7,9 +7,9 @@ use App\Models\Inventory;
 use App\Models\Product;
 use Illuminate\Database\LazyLoadingViolationException;
 use Illuminate\Database\QueryException;
-use Tests\TestCase;
+use Tests\Feature\FeatureTestCase;
 
-class CatalogTest extends TestCase
+class CatalogTest extends FeatureTestCase
 {
     public function test_categories_nest_through_parent_and_children(): void
     {

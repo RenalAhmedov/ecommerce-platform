@@ -12,9 +12,8 @@ use App\Services\ReportService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Carbon;
 use Illuminate\Testing\TestResponse;
-use Tests\TestCase;
 
-class ReportTest extends TestCase
+class ReportTest extends FeatureTestCase
 {
     private User $admin;
 

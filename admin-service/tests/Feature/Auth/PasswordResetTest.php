@@ -6,9 +6,9 @@ use App\Models\User;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
-use Tests\TestCase;
+use Tests\Feature\FeatureTestCase;
 
-class PasswordResetTest extends TestCase
+class PasswordResetTest extends FeatureTestCase
 {
     private const GENERIC_STATUS = 'If an admin account exists for this email, a reset link is on its way.';
 

@@ -12,7 +12,7 @@ use Intervention\Image\Interfaces\ImageManagerInterface;
  * Re-encoding to WebP also drops EXIF metadata (camera, GPS location) from uploads.
  * Photos are turned upright first (autoOrientation), since EXIF rotation is lost.
  */
-final class ImageResizer
+class ImageResizer
 {
     private const QUALITY = 80;
 

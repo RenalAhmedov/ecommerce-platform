@@ -8,9 +8,9 @@ use App\Models\User;
 use App\Services\UserService;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
-use Tests\TestCase;
+use Tests\Feature\FeatureTestCase;
 
-class UserManagementTest extends TestCase
+class UserManagementTest extends FeatureTestCase
 {
     private User $admin;
 

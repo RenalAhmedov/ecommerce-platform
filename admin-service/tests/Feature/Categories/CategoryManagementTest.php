@@ -6,9 +6,9 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\User;
 use App\Services\CategoryService;
-use Tests\TestCase;
+use Tests\Feature\FeatureTestCase;
 
-class CategoryManagementTest extends TestCase
+class CategoryManagementTest extends FeatureTestCase
 {
     private User $admin;
 

@@ -182,17 +182,29 @@ Tests do not need Redis: `phpunit.xml` switches to the in-memory `array` cache/s
 
 ## Tests
 
+Two suites, like the Nest api-gateway's unit and integration tests:
+
+| Suite | Folder | What it covers | Needs |
+|---|---|---|---|
+| **Unit** | `tests/Unit` | one service at a time with its repositories mocked (business rules, lock order, edge cases) | nothing — no database, Redis or Docker; any accidental database call fails the test |
+| **Integration** | `tests/Feature` (Laravel's name for them) | the real application over HTTP: routes, middleware, Form Requests, services, repositories, SQL, locks, queues, files | Docker: a throwaway `postgres:16-alpine` and `redis:7-alpine` are started with **Testcontainers** for the run and removed afterwards |
+
 ```bash
-docker compose exec admin-service php artisan test
+docker compose run --rm admin-tests                                   # everything
+docker compose run --rm admin-tests php artisan test --testsuite=Unit
+docker compose run --rm admin-tests php artisan test --testsuite=Feature
+docker compose run --rm admin-tests php artisan test --filter=OrderManagementTest
 ```
 
-Tests run against the separate `ecommerce_admin_test` database (set in `phpunit.xml`), never the dev database. It is created automatically for fresh Postgres volumes (`docker/postgres/init/`); on an existing volume create it once:
+`admin-tests` is a test-only service (compose profile `test`, never started by `docker compose up`). It is the only container that gets the Docker socket, so Testcontainers can start the throwaway databases; the running app and worker never get it. With PHP and Docker on the machine itself (as in CI) the same tests run with `composer test`, `composer test:unit` and `composer test:integration` and need no extra setup. Unit tests also run inside the app container (`docker compose exec admin-service composer test:unit`).
+
+The integration tests never touch the development database or Redis. The full schema (the shared tables plus this service's own) is built once per run in the throwaway Postgres, and every test runs in a transaction that is rolled back. `migrate:fresh`, `db:wipe` and similar commands stay blocked outside tests because they would drop the Nest service's tables in the shared database.
+
+If a run is killed half-way, its containers can be removed with:
 
 ```bash
-docker compose exec postgres psql -U ecommerce -d postgres -c "CREATE DATABASE ecommerce_admin_test"
+docker rm -f $(docker ps -aq --filter label=ecommerce-platform.tests=admin-service)
 ```
-
-The schema is rebuilt from both migration folders at the start of a run and every test runs in a rolled-back transaction. `migrate:fresh`, `db:wipe` and similar commands are blocked outside tests because they would drop the Nest service's tables in the shared database.
 
 ## Day-to-day commands
 

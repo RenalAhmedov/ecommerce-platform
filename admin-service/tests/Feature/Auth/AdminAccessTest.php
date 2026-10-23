@@ -4,9 +4,9 @@ namespace Tests\Feature\Auth;
 
 use App\Enums\UserRole;
 use App\Models\User;
-use Tests\TestCase;
+use Tests\Feature\FeatureTestCase;
 
-class AdminAccessTest extends TestCase
+class AdminAccessTest extends FeatureTestCase
 {
     public function test_the_root_url_redirects_to_the_dashboard(): void
     {

@@ -12,7 +12,6 @@ services:
       - "127.0.0.1:${DB_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -58,6 +57,22 @@ services:
     <<: *admin-service
     command: ["php", "artisan", "queue:listen", "--tries=3", "--timeout=60"]
     ports: []
+
+  # Test runner only (`docker compose run --rm admin-tests`); never started by `up`.
+  # The Docker socket lets Testcontainers start throwaway Postgres/Redis, which
+  # are reached through the host; the app containers above get no socket access.
+  admin-tests:
+    image: ecommerce-platform-admin-service
+    build: ./admin-service
+    profiles: ["test"]
+    command: ["php", "artisan", "test"]
+    volumes:
+      - ./admin-service:/var/www/html
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      TESTCONTAINERS_HOST_OVERRIDE: host.docker.internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 volumes:
   postgres-data:

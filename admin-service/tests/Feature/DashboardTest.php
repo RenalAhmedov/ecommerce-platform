@@ -10,9 +10,8 @@ use App\Models\Product;
 use App\Models\User;
 use App\Services\DashboardService;
 use Illuminate\Support\Carbon;
-use Tests\TestCase;
 
-class DashboardTest extends TestCase
+class DashboardTest extends FeatureTestCase
 {
     private User $admin;
 

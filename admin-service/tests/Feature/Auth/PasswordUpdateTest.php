@@ -4,9 +4,9 @@ namespace Tests\Feature\Auth;
 
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
-use Tests\TestCase;
+use Tests\Feature\FeatureTestCase;
 
-class PasswordUpdateTest extends TestCase
+class PasswordUpdateTest extends FeatureTestCase
 {
     public function test_password_can_be_updated(): void
     {

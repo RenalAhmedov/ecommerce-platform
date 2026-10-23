@@ -5,10 +5,10 @@ namespace Tests\Feature\Repositories;
 use App\Repositories\RevokedTokenRepository;
 use Illuminate\Support\Str;
 use Redis;
-use Tests\TestCase;
+use Tests\Feature\FeatureTestCase;
 
 /** Uses the real Redis: the key must be exactly what the Nest api-gateway writes. */
-class RevokedTokenRepositoryTest extends TestCase
+class RevokedTokenRepositoryTest extends FeatureTestCase
 {
     public function test_it_reads_the_unprefixed_key_written_by_nest(): void
     {

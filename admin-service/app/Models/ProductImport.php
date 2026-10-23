@@ -17,6 +17,10 @@ class ProductImport extends Model
     protected $attributes = [
         'status' => 'queued',
         'errors' => '[]',
+        'processed_rows' => 0,
+        'created_count' => 0,
+        'updated_count' => 0,
+        'failed_count' => 0,
     ];
 
     /** @return BelongsTo<User, $this> */

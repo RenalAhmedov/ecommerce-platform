@@ -5,9 +5,9 @@ namespace Tests\Feature\Support;
 use App\Support\AdvisoryLock;
 use Illuminate\Support\Facades\DB;
 use LogicException;
-use Tests\TestCase;
+use Tests\Feature\FeatureTestCase;
 
-class AdvisoryLockTest extends TestCase
+class AdvisoryLockTest extends FeatureTestCase
 {
     public function test_keys_match_the_nest_api_format(): void
     {

@@ -18,9 +18,9 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Mockery\MockInterface;
 use RedisException;
-use Tests\TestCase;
+use Tests\Feature\FeatureTestCase;
 
-class ProductApiTest extends TestCase
+class ProductApiTest extends FeatureTestCase
 {
     private User $admin;
 

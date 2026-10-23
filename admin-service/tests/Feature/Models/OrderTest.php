@@ -12,9 +12,9 @@ use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Tests\TestCase;
+use Tests\Feature\FeatureTestCase;
 
-class OrderTest extends TestCase
+class OrderTest extends FeatureTestCase
 {
     public function test_order_casts_status_money_and_address(): void
     {

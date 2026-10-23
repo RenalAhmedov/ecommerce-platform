@@ -10,9 +10,9 @@ use App\Services\ProductService;
 use Illuminate\Validation\ValidationException;
 use Mockery;
 use Mockery\MockInterface;
-use Tests\TestCase;
+use Tests\Unit\UnitTestCase;
 
-class ProductServiceTest extends TestCase
+class ProductServiceTest extends UnitTestCase
 {
     private ProductRepository&MockInterface $products;
 

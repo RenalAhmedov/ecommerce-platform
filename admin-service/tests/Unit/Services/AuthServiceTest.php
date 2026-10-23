@@ -8,9 +8,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
-use Tests\TestCase;
+use Tests\Unit\UnitTestCase;
 
-class AuthServiceTest extends TestCase
+class AuthServiceTest extends UnitTestCase
 {
     private AuthService $service;
 

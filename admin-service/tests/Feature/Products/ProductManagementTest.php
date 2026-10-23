@@ -7,9 +7,9 @@ use App\Models\Category;
 use App\Models\Inventory;
 use App\Models\Product;
 use App\Models\User;
-use Tests\TestCase;
+use Tests\Feature\FeatureTestCase;
 
-class ProductManagementTest extends TestCase
+class ProductManagementTest extends FeatureTestCase
 {
     private User $admin;
 

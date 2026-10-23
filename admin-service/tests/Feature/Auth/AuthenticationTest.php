@@ -3,9 +3,9 @@
 namespace Tests\Feature\Auth;
 
 use App\Models\User;
-use Tests\TestCase;
+use Tests\Feature\FeatureTestCase;
 
-class AuthenticationTest extends TestCase
+class AuthenticationTest extends FeatureTestCase
 {
     public function test_login_screen_can_be_rendered(): void
     {

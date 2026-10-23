@@ -11,9 +11,9 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
-use Tests\TestCase;
+use Tests\Feature\FeatureTestCase;
 
-class ProductImageTest extends TestCase
+class ProductImageTest extends FeatureTestCase
 {
     private User $admin;
 

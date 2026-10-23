@@ -22,6 +22,8 @@ class JwtAuthService
 {
     private const ALGORITHM = 'HS256';
 
+    private const MIN_SECRET_BYTES = 32;
+
     public function __construct(
         private readonly UserRepository $users,
         private readonly RevokedTokenRepository $revokedTokens,
@@ -50,8 +52,10 @@ class JwtAuthService
     /** Null for a bad signature, an expired or malformed token, or another algorithm. */
     private function decode(string $token): ?object
     {
-        if (blank($this->secret)) {
-            throw new LogicException('JWT_SECRET is not configured.');
+        // php-jwt refuses HS256 keys under 32 bytes; that must surface as a configuration
+        // error, not be mistaken for a bad token (which would reject every login silently).
+        if (blank($this->secret) || strlen($this->secret) < self::MIN_SECRET_BYTES) {
+            throw new LogicException('JWT_SECRET must be set and at least '.self::MIN_SECRET_BYTES.' bytes long (the same secret as the Nest api-gateway).');
         }
 
         try {
