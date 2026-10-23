@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductImageController;
 use Illuminate\Support\Facades\Route;
@@ -16,6 +17,11 @@ Route::middleware(['auth', 'admin'])->group(function () {
         ->name('products.restore');
     Route::post('products/{product}/image', [ProductImageController::class, 'store'])->name('products.image.store');
     Route::delete('products/{product}/image', [ProductImageController::class, 'destroy'])->name('products.image.destroy');
+
+    Route::resource('categories', CategoryController::class)->except('show');
+    Route::patch('categories/{category}/restore', [CategoryController::class, 'restore'])
+        ->withTrashed()
+        ->name('categories.restore');
 });
 
 require __DIR__.'/auth.php';

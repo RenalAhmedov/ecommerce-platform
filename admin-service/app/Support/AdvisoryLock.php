@@ -29,6 +29,16 @@ final class AdvisoryLock
     }
 
     /**
+     * Only the admin service writes categories, and those writes are rare, so
+     * one lock serialises them all: slug checks and moves within the tree
+     * (two concurrent moves could otherwise create a loop).
+     */
+    public static function categoryTree(): string
+    {
+        return 'categories.tree';
+    }
+
+    /**
      * Keys are taken in sorted order so two writers never wait on each other
      * in opposite order (deadlock). Released automatically at commit/rollback.
      *

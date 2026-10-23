@@ -87,6 +87,16 @@ Responses use the Nest field names (`isActive`, `imagePath`, `stock`, …) and l
 
 How a token is checked (`App\Services\JwtAuthService`): HS256 signature with `JWT_SECRET` (must equal the api-gateway's), not expired, has `sub` and `jti`, not revoked — the Nest logout key `auth:revoked-token:<jti>` is read from Redis without the `admin:` prefix (fails open if Redis is down, like Nest) — and the user still exists. The **admin role is read from the database**, not from the token, so a demoted admin loses access immediately (403). Rate limit: 120 requests/minute per user.
 
+## Categories
+
+Categories form a tree through `parent_id` (Electronics › Computers › Laptops) and are managed only by this service (the Nest API reads them). Rules enforced in `App\Services\CategoryService`:
+
+- a category cannot be moved under itself or any of its subcategories (checked with a recursive SQL query up the parent chain);
+- all category writes take one advisory lock (`categories.tree`), so two admins moving categories at the same moment can't create a loop, and slug checks can't race;
+- a category with subcategories cannot be deleted; its products keep their `category_id` and show as uncategorised until the category is restored;
+- a subcategory can only be restored after its parent;
+- slugs stay reserved by trashed categories, like product SKUs.
+
 ## Product images
 
 Uploading an image (edit page, or `POST /admin/api/products/{id}/image` as multipart `image`) only stores the original on the private disk and queues `App\Jobs\ProcessProductImage`; the request returns at once (the API answers **202**). The `admin-worker` then:

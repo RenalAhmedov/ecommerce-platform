@@ -34,4 +34,12 @@ class Category extends Model
     {
         return $this->hasMany(Product::class);
     }
+
+    /** @return array<string, string> */
+    protected function casts(): array
+    {
+        return [
+            'parent_id' => 'integer',
+        ];
+    }
 }
