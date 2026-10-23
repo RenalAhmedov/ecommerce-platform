@@ -48,6 +48,20 @@ docker compose exec admin-service php artisan migrate
 
 Both frameworks produce an identical schema (verified by diffing `pg_dump --schema-only` of a database built by each).
 
+## Tests
+
+```bash
+docker compose exec admin-service php artisan test
+```
+
+Tests run against the separate `ecommerce_admin_test` database (set in `phpunit.xml`), never the dev database. It is created automatically for fresh Postgres volumes (`docker/postgres/init/`); on an existing volume create it once:
+
+```bash
+docker compose exec postgres psql -U ecommerce -d postgres -c "CREATE DATABASE ecommerce_admin_test"
+```
+
+The schema is rebuilt from both migration folders at the start of a run and every test runs in a rolled-back transaction. `migrate:fresh`, `db:wipe` and similar commands are blocked outside tests because they would drop the Nest service's tables in the shared database.
+
 ## Day-to-day commands
 
 Run PHP tools inside the container:
