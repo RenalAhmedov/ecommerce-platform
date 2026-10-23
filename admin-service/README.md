@@ -23,6 +23,22 @@ docker compose run --rm --no-deps admin-service php artisan key:generate
 docker compose up -d admin-service
 ```
 
+Build the CSS/JS (Tailwind + Alpine via Vite) whenever `resources/css`, `resources/js` or the Blade views change. Node runs in a throwaway container:
+
+```bash
+docker run --rm -v "$PWD/admin-service":/app -w /app node:24-alpine sh -c "npm ci && npm run build"
+```
+
+## Admin access
+
+Only users with the `admin` role can sign in at **/login**. Customers (who register through the Nest API) get the same "credentials do not match" error as a wrong password, and the `admin` middleware signs out any session whose user is no longer an admin. There is no self-registration: promote an existing user instead.
+
+```bash
+docker compose exec postgres psql -U ecommerce -d ecommerce -c "UPDATE users SET role = 'admin' WHERE email = 'you@example.com'"
+```
+
+Password reset emails go to Mailpit at http://localhost:8025 and are only sent to admin accounts.
+
 ## Database and migrations
 
 Both services share one PostgreSQL database, so table ownership is explicit:

@@ -32,9 +32,4 @@ class UserFactory extends Factory
     {
         return $this->state(fn () => ['role' => UserRole::Admin]);
     }
-
-    public function unverified(): static
-    {
-        return $this->state(fn () => ['email_verified_at' => null]);
-    }
 }
