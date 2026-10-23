@@ -34,6 +34,7 @@
                 <table class="min-w-full divide-y divide-gray-200 text-sm">
                     <thead class="bg-gray-50 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                         <tr>
+                            <th class="px-4 py-3"></th>
                             <th class="px-4 py-3">{{ __('SKU') }}</th>
                             <th class="px-4 py-3">{{ __('Name') }}</th>
                             <th class="px-4 py-3">{{ __('Category') }}</th>
@@ -46,6 +47,13 @@
                     <tbody class="divide-y divide-gray-100">
                         @forelse ($products as $product)
                             <tr>
+                                <td class="px-4 py-2">
+                                    @if ($product->thumbnail_url)
+                                        <img src="{{ $product->thumbnail_url }}" alt="" class="h-10 w-10 rounded object-cover">
+                                    @else
+                                        <div class="h-10 w-10 rounded bg-gray-100"></div>
+                                    @endif
+                                </td>
                                 <td class="px-4 py-3 font-mono">{{ $product->sku }}</td>
                                 <td class="px-4 py-3">{{ $product->name }}</td>
                                 <td class="px-4 py-3 text-gray-600">{{ $product->category?->name ?? '—' }}</td>
@@ -85,7 +93,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="px-4 py-6 text-center text-gray-500">{{ __('No products found.') }}</td>
+                                <td colspan="8" class="px-4 py-6 text-center text-gray-500">{{ __('No products found.') }}</td>
                             </tr>
                         @endforelse
                     </tbody>

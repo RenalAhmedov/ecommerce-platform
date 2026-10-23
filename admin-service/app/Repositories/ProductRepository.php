@@ -44,6 +44,12 @@ class ProductRepository
         return Product::whereKey($id)->lockForUpdate()->firstOrFail();
     }
 
+    /** Like lockById, but also finds trashed products and returns null when the row is gone. */
+    public function lockByIdWithTrashed(int $id): ?Product
+    {
+        return Product::withTrashed()->whereKey($id)->lockForUpdate()->first();
+    }
+
     /** Same advisory lock keys as the Nest api-gateway, so both services wait on each other. */
     public function lockUniqueValues(?string $sku, ?string $slug): void
     {

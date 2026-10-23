@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * Same field names as the Nest ProductResponseDto, plus deletedAt for the trash.
+ * Same field names as the Nest ProductResponseDto, plus image URLs and deletedAt.
  *
  * @mixin Product
  */
@@ -24,6 +24,8 @@ class ProductResource extends JsonResource
             'description' => $this->description,
             'price' => $this->price,
             'imagePath' => $this->image_path,
+            'imageUrl' => $this->image_url,
+            'thumbnailUrl' => $this->thumbnail_url,
             'isActive' => $this->is_active,
             'category' => $this->whenLoaded('category', fn () => [
                 'id' => $this->category->id,

@@ -2,12 +2,16 @@
 
 namespace Tests\Feature\Api;
 
+use App\Jobs\ProcessProductImage;
 use App\Models\Category;
 use App\Models\Inventory;
 use App\Models\Product;
 use App\Models\User;
 use App\Repositories\RevokedTokenRepository;
 use Firebase\JWT\JWT;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Mockery\MockInterface;
 use RedisException;
@@ -114,7 +118,7 @@ class ProductApiTest extends TestCase
         $item = $this->api()->getJson('/admin/api/products?search=MUG-1')->json('data.0');
 
         $this->assertSame(
-            ['id', 'name', 'slug', 'sku', 'description', 'price', 'imagePath', 'isActive', 'category', 'stock', 'createdAt', 'updatedAt', 'deletedAt'],
+            ['id', 'name', 'slug', 'sku', 'description', 'price', 'imagePath', 'imageUrl', 'thumbnailUrl', 'isActive', 'category', 'stock', 'createdAt', 'updatedAt', 'deletedAt'],
             array_keys($item),
         );
         $this->assertSame('9.50', $item['price']);
@@ -170,6 +174,39 @@ class ProductApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.name', 'Keep')
             ->assertJsonPath('data.price', '2.50');
+    }
+
+    public function test_image_upload_returns_202_and_the_urls_appear_once_processed(): void
+    {
+        Storage::fake('public');
+        Storage::fake('local');
+        $product = Product::factory()->create();
+
+        Queue::fake();
+        $this->api()->post("/admin/api/products/{$product->id}/image", ['image' => UploadedFile::fake()->image('a.jpg')], ['Accept' => 'application/json'])
+            ->assertAccepted()
+            ->assertJsonPath('meta.imageProcessing', true)
+            ->assertJsonPath('data.imageUrl', null);
+        Queue::assertPushed(ProcessProductImage::class);
+    }
+
+    public function test_image_upload_and_removal_through_the_api(): void
+    {
+        Storage::fake('public');
+        Storage::fake('local');
+        $product = Product::factory()->create();
+
+        $this->api()->post("/admin/api/products/{$product->id}/image", ['image' => UploadedFile::fake()->image('a.jpg')], ['Accept' => 'application/json'])
+            ->assertAccepted();
+
+        $shown = $this->api()->getJson("/admin/api/products/{$product->id}")->json('data');
+        $this->assertStringEndsWith($shown['imagePath'], $shown['imageUrl']);
+        $this->assertStringEndsWith('-thumb.webp', $shown['thumbnailUrl']);
+
+        $this->api()->deleteJson("/admin/api/products/{$product->id}/image")
+            ->assertOk()
+            ->assertJsonPath('data.imagePath', null)
+            ->assertJsonPath('data.imageUrl', null);
     }
 
     public function test_delete_returns_204_and_restore_brings_it_back(): void

@@ -21,6 +21,7 @@ cp admin-service/.env.example admin-service/.env
 docker compose run --rm --no-deps admin-service composer install
 docker compose run --rm --no-deps admin-service php artisan key:generate
 docker compose up -d admin-service
+docker compose exec admin-service php artisan storage:link   # serves storage/app/public at /storage
 ```
 
 Build the CSS/JS (Tailwind + Alpine via Vite) whenever `resources/css`, `resources/js` or the Blade views change. Node runs in a throwaway container:
@@ -85,6 +86,16 @@ curl -H "Authorization: Bearer $TOKEN" -H "Accept: application/json" "http://loc
 Responses use the Nest field names (`isActive`, `imagePath`, `stock`, …) and list pages return `{ data, meta: { page, limit, total, totalPages } }`.
 
 How a token is checked (`App\Services\JwtAuthService`): HS256 signature with `JWT_SECRET` (must equal the api-gateway's), not expired, has `sub` and `jti`, not revoked — the Nest logout key `auth:revoked-token:<jti>` is read from Redis without the `admin:` prefix (fails open if Redis is down, like Nest) — and the user still exists. The **admin role is read from the database**, not from the token, so a demoted admin loses access immediately (403). Rate limit: 120 requests/minute per user.
+
+## Product images
+
+Uploading an image (edit page, or `POST /admin/api/products/{id}/image` as multipart `image`) only stores the original on the private disk and queues `App\Jobs\ProcessProductImage`; the request returns at once (the API answers **202**). The `admin-worker` then:
+
+1. turns the photo upright and re-encodes it as WebP (which also strips EXIF data such as GPS location): a 1200 px version (never enlarged) and a 300×300 thumbnail,
+2. stores both as `storage/app/public/products/<id>/<uuid>.webp` and `<uuid>-thumb.webp`, served at `/storage/...`,
+3. swaps `products.image_path` under a row lock and deletes the previous files and the original upload.
+
+Only the newest upload of a product is ever applied (two quick uploads can't end with the older picture), removing an image also cancels an upload still in the queue, and a file that can't be decoded fails the job at once instead of retrying. Uploads are limited to JPEG/PNG/WebP, 5 MB and 8000 px per side.
 
 ## Redis and the queue worker
 

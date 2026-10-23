@@ -8,6 +8,7 @@ use App\Http\Requests\Products\StoreProductRequest;
 use App\Http\Requests\Products\UpdateProductRequest;
 use App\Models\Product;
 use App\Services\CategoryService;
+use App\Services\ProductImageService;
 use App\Services\ProductService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -19,6 +20,7 @@ class ProductController extends Controller
     public function __construct(
         private readonly ProductService $products,
         private readonly CategoryService $categories,
+        private readonly ProductImageService $images,
     ) {}
 
     public function index(ProductIndexRequest $request): View
@@ -47,6 +49,7 @@ class ProductController extends Controller
         return view('products.edit', [
             'product' => $this->products->withDetails($product),
             'categories' => $this->categories->options(),
+            'imageProcessing' => $this->images->isProcessing($product),
         ]);
     }
 
