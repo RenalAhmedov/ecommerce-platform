@@ -11,10 +11,7 @@ import type { EnvironmentVariables } from '../config/interfaces/environment-vari
 import { UserResponseDto } from '../users/dto/user-response.dto.js';
 import type { User } from '../users/entities/user.entity.js';
 import { UsersService } from '../users/users.service.js';
-import {
-  BCRYPT_ROUNDS,
-  UNKNOWN_USER_PASSWORD_HASH,
-} from './constants/auth.constants.js';
+import { UNKNOWN_USER_PASSWORD_HASH } from './constants/auth.constants.js';
 import type { AuthResponseDto } from './dto/auth-response.dto.js';
 import type { LoginDto } from './dto/login.dto.js';
 import type { RegisterDto } from './dto/register.dto.js';
@@ -23,6 +20,7 @@ import type {
   JwtPayload,
 } from './interfaces/jwt-payload.interface.js';
 import { RevokedTokenStore } from './revoked-token.store.js';
+import { hashPassword } from './utils/password.js';
 
 @Injectable()
 export class AuthService {
@@ -37,7 +35,7 @@ export class AuthService {
     const user = await this.usersService.createCustomer({
       name: dto.name,
       email: dto.email,
-      password: await bcrypt.hash(dto.password, BCRYPT_ROUNDS),
+      password: await hashPassword(dto.password),
     });
 
     return this.buildAuthResponse(user);

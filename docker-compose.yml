@@ -39,6 +39,58 @@ services:
       - "127.0.0.1:${MAIL_SMTP_PORT:-1025}:1025"
       - "127.0.0.1:${MAIL_UI_PORT:-8025}:8025"
 
+  admin-service: &admin-service
+    build: ./admin-service
+    image: ecommerce-platform-admin-service
+    restart: unless-stopped
+    volumes:
+      - ./admin-service:/var/www/html
+    ports:
+      - "127.0.0.1:${ADMIN_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  admin-worker:
+    <<: *admin-service
+    command: ["php", "artisan", "queue:listen", "--tries=3", "--timeout=60"]
+    ports: []
+
+  # Test runner only, never started by `up`:
+  #   docker compose run --rm admin-tests                      (all tests)
+  #   docker compose run --rm admin-tests --testsuite=Unit     (any `php artisan test` options)
+  # On a fresh clone it creates .env from .env.example and installs the PHP dependencies first.
+  # The Docker socket lets Testcontainers start throwaway Postgres/Redis, which
+  # are reached through the host; the app containers above get no socket access.
+  admin-tests:
+    image: ecommerce-platform-admin-service
+    build: ./admin-service
+    profiles: ["test"]
+    entrypoint: ["sh", "-c", "[ -f .env ] || cp .env.example .env; composer install --no-interaction --no-progress --quiet && exec php artisan test \"$$@\"", "--"]
+    command: []
+    volumes:
+      - ./admin-service:/var/www/html
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      TESTCONTAINERS_HOST_OVERRIDE: host.docker.internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Builds the panel's CSS/JS into admin-service/public/build (`docker compose run --rm admin-assets`).
+  # node_modules lives in its own volume, so it never mixes Linux packages into
+  # a node_modules folder installed on the host (macOS/Windows) and vice versa.
+  admin-assets:
+    image: node:24-alpine
+    profiles: ["tools"]
+    working_dir: /app
+    command: ["sh", "-c", "npm ci --no-audit --no-fund && npm run build"]
+    volumes:
+      - ./admin-service:/app
+      - admin-node-modules:/app/node_modules
+
 volumes:
   postgres-data:
   redis-data:
+  admin-node-modules:
