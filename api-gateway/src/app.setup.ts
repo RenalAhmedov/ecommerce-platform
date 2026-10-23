@@ -13,6 +13,7 @@ const EXPOSED_HEADERS = [
   'X-RateLimit-Limit',
   'X-RateLimit-Remaining',
   'X-RateLimit-Reset',
+  'X-Request-Id',
 ];
 
 export function configureApp(app: INestApplication): void {

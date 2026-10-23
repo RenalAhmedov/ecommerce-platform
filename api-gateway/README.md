@@ -23,6 +23,13 @@ Interactive Swagger UI: **http://localhost:3000/api/docs** (raw OpenAPI JSON at 
 - **Security headers** via `helmet` (CSP, HSTS, no-sniff, frame protection, no `X-Powered-By`).
 - **CORS** is off unless `CORS_ORIGINS` lists allowed browser origins (comma-separated).
 
+## Logs
+
+- **One line per request**: method, path, status, duration, the user id and a request id. The id is returned as `X-Request-Id`; a valid one sent by the caller is kept, and the admin service sends the id of the admin action that triggered its webhook, so one change can be followed through both services' logs.
+- **Business events**: registrations, logins, logouts, product writes (with the admin's user id), orders placed, paid and declined, confirmation emails sent, stale orders expired.
+- **Security events** (warnings): failed logins, revoked tokens being used again.
+- **Infrastructure trouble** (Redis, queue or SMTP unavailable) is logged once a minute at most, so an outage does not flood the log. Passwords and tokens are never logged.
+
 ## Catalogue sync from the admin service
 
 Products, categories and stock are also changed by the Laravel admin service, directly in the shared database. It then calls **`POST /api/internal/webhooks/catalog`** (body `{ eventId, type: "catalog.changed", occurredAt }`), and this API drops its cached product responses at once instead of after their TTL.

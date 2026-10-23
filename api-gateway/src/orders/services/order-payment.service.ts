@@ -24,6 +24,9 @@ export class OrderPaymentService {
 
     if (result.status === 'succeeded') {
       if (await this.markPaid(order, result.transactionId)) {
+        this.logger.log(
+          `Order ${order.orderNumber} paid (${result.transactionId})`,
+        );
         await this.orderEventsPublisher.publishPaid({
           orderId: order.id,
           orderNumber: order.orderNumber,
@@ -35,6 +38,9 @@ export class OrderPaymentService {
       return true;
     }
 
+    this.logger.warn(
+      `Payment for order ${order.orderNumber} declined (${result.reason}), releasing its stock`,
+    );
     await this.orderReleaseService.releasePending(order);
     return false;
   }

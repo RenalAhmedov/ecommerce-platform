@@ -186,14 +186,27 @@ describe('ProductsWriteService', () => {
         throw new BadRequestException();
       });
 
-      await expect(service.update(7, {})).rejects.toThrow(BadRequestException);
+      await expect(service.update(7, {}, 1)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(repository.transaction).not.toHaveBeenCalled();
+    });
+
+    it('checks a new category before opening a transaction', async () => {
+      validator.ensureCategoryExists.mockRejectedValue(
+        new BadRequestException('Category not found'),
+      );
+
+      await expect(service.update(7, { categoryId: 404 }, 1)).rejects.toThrow(
+        'Category not found',
+      );
       expect(repository.transaction).not.toHaveBeenCalled();
     });
 
     it('throws NotFound when the product row cannot be locked', async () => {
       transactionRepository.lockById.mockResolvedValue(false);
 
-      await expect(service.update(99, { price: 10 })).rejects.toThrow(
+      await expect(service.update(99, { price: 10 }, 1)).rejects.toThrow(
         NotFoundException,
       );
       expect(transactionRepository.update).not.toHaveBeenCalled();
@@ -201,7 +214,7 @@ describe('ProductsWriteService', () => {
     });
 
     it('only checks uniqueness for the fields that change', async () => {
-      await service.update(7, { price: 10 });
+      await service.update(7, { price: 10 }, 1);
 
       expect(validator.ensureSkuAvailable).not.toHaveBeenCalled();
       expect(validator.ensureSlugAvailable).not.toHaveBeenCalled();
@@ -211,7 +224,7 @@ describe('ProductsWriteService', () => {
     });
 
     it('checks a new SKU and slug while excluding the product itself', async () => {
-      await service.update(7, { sku: 'MK-002', slug: 'keyboard-v2' });
+      await service.update(7, { sku: 'MK-002', slug: 'keyboard-v2' }, 1);
 
       expect(transactionRepository.lockUniqueValues).toHaveBeenCalledWith({
         sku: 'MK-002',
@@ -230,7 +243,7 @@ describe('ProductsWriteService', () => {
     });
 
     it('returns the product read after the update and invalidates the cache', async () => {
-      const result = await service.update(7, { name: 'Renamed' });
+      const result = await service.update(7, { name: 'Renamed' }, 1);
 
       expect(
         transactionRepository.update.mock.invocationCallOrder[0],

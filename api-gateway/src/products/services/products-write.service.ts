@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InventoryService } from '../../inventory/inventory.service.js';
 import type { CreateProductDto } from '../dto/create-product.dto.js';
 import { ProductResponseDto } from '../dto/product-response.dto.js';
@@ -10,6 +10,8 @@ import { ProductValidator } from '../validators/product.validator.js';
 
 @Injectable()
 export class ProductsWriteService {
+  private readonly logger = new Logger(ProductsWriteService.name);
+
   constructor(
     private readonly productsRepository: ProductsRepository,
     private readonly productsCache: ProductsCache,
@@ -43,13 +45,21 @@ export class ProductsWriteService {
     );
 
     await this.productsCache.invalidate();
+    this.logger.log(
+      `Product ${product.id} (${product.sku}) created by user ${createdBy}`,
+    );
 
     return ProductResponseDto.fromEntity(product);
   }
 
-  async update(id: number, dto: UpdateProductDto): Promise<ProductResponseDto> {
+  async update(
+    id: number,
+    dto: UpdateProductDto,
+    updatedBy: number,
+  ): Promise<ProductResponseDto> {
     const changes = toProductChanges(dto);
     this.productValidator.ensureHasChanges(changes);
+    await this.productValidator.ensureCategoryExists(changes.categoryId);
 
     const product = await this.productsRepository.transaction(
       async (products) => {
@@ -57,7 +67,6 @@ export class ProductsWriteService {
           throw new NotFoundException('Product not found');
         }
 
-        await this.productValidator.ensureCategoryExists(changes.categoryId);
         await products.lockUniqueValues({
           sku: changes.sku,
           slug: changes.slug,
@@ -86,6 +95,9 @@ export class ProductsWriteService {
     );
 
     await this.productsCache.invalidate();
+    this.logger.log(
+      `Product ${id} updated by user ${updatedBy} (${Object.keys(changes).join(', ')})`,
+    );
 
     return ProductResponseDto.fromEntity(product);
   }

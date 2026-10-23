@@ -2,6 +2,7 @@ import {
   CanActivate,
   ExecutionContext,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
@@ -14,6 +15,8 @@ import { RevokedTokenStore } from '../revoked-token.store.js';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
+  private readonly logger = new Logger(JwtAuthGuard.name);
+
   constructor(
     private readonly jwtService: JwtService,
     private readonly reflector: Reflector,
@@ -38,6 +41,10 @@ export class JwtAuthGuard implements CanActivate {
     const claims = await this.verify(this.extractBearerToken(request));
 
     if (await this.revokedTokenStore.isRevoked(claims)) {
+      // A revoked token being reused can mean it was stolen.
+      this.logger.warn(
+        `Revoked access token used: user ${claims.sub}, token ${claims.jti}`,
+      );
       throw new UnauthorizedException('Access token has been revoked');
     }
 

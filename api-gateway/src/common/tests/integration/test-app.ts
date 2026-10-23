@@ -19,7 +19,7 @@ const TABLES = [
   'users',
 ];
 
-export interface ApiResponse<T = Record<string, unknown>> {
+interface ApiResponse<T = Record<string, unknown>> {
   status: number;
   body: T;
   headers: Headers;
