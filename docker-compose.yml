@@ -40,8 +40,9 @@ services:
       - "127.0.0.1:${MAIL_SMTP_PORT:-1025}:1025"
       - "127.0.0.1:${MAIL_UI_PORT:-8025}:8025"
 
-  admin-service:
+  admin-service: &admin-service
     build: ./admin-service
+    image: ecommerce-platform-admin-service
     restart: unless-stopped
     volumes:
       - ./admin-service:/var/www/html
@@ -52,6 +53,11 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  admin-worker:
+    <<: *admin-service
+    command: ["php", "artisan", "queue:listen", "--tries=3", "--timeout=60"]
+    ports: []
 
 volumes:
   postgres-data:

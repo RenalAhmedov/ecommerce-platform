@@ -9,7 +9,7 @@ Everything runs in Docker: you do not need PHP or Composer installed locally.
 From the repository root:
 
 ```bash
-docker compose up -d          # starts postgres, redis, mailpit and admin-service
+docker compose up -d          # starts postgres, redis, mailpit, admin-service and admin-worker
 ```
 
 The panel is served at **http://localhost:8000** (`ADMIN_PORT` in the root `.env`).
@@ -63,6 +63,28 @@ docker compose exec admin-service php artisan migrate
 ```
 
 Both frameworks produce an identical schema (verified by diffing `pg_dump --schema-only` of a database built by each).
+
+## Redis and the queue worker
+
+Sessions, cache and queues use the shared Redis. Every Laravel key starts with `admin:` (`REDIS_PREFIX`), so it never collides with the Nest service's keys (`bull:*`, `idempotency:*`, `products:*`, `auth:*`).
+
+| What | Redis DB | Example key |
+|---|---|---|
+| Sessions | 0 | `admin:<session id>` |
+| Queue (`default`) | 0 | `admin:queues:default` |
+| Cache, login rate limiter | 1 | `admin:<cache key>` |
+
+The cache lives in its own Redis database because `php artisan cache:clear` runs `FLUSHDB` on it: in database 0 it would also wipe the Nest queues and idempotency keys, and log every admin out.
+
+Queued jobs are run by the `admin-worker` container (`php artisan queue:listen`, which reloads code for every job so edits apply without a restart). A job is tried 3 times; after that it is stored in the Postgres `failed_jobs` table:
+
+```bash
+docker compose logs -f admin-worker
+docker compose exec admin-service php artisan queue:failed     # list
+docker compose exec admin-service php artisan queue:retry all  # retry
+```
+
+Tests do not need Redis: `phpunit.xml` switches to the in-memory `array` cache/session and the `sync` queue.
 
 ## Tests
 
