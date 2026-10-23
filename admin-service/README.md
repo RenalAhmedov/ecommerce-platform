@@ -23,6 +23,31 @@ docker compose run --rm --no-deps admin-service php artisan key:generate
 docker compose up -d admin-service
 ```
 
+## Database and migrations
+
+Both services share one PostgreSQL database, so table ownership is explicit:
+
+| Tables | Owned by | Migrations |
+|---|---|---|
+| users, categories, products, inventories, orders, order_items, inventory_movements | shared (created by the Nest.js `api-gateway`) | `database/migrations/shared/` – an exact Laravel copy of the schema, **not** run by `php artisan migrate` |
+| password_reset_tokens, failed_jobs | Laravel | `database/migrations/` – run by `php artisan migrate` |
+
+Laravel records its migrations in `laravel_migrations` (TypeORM uses `migrations`), so the two histories never collide.
+
+```bash
+docker compose exec admin-service php artisan migrate          # Laravel-owned tables only
+docker compose exec admin-service php artisan migrate:status
+```
+
+To build the full schema with Laravel alone (e.g. a fresh database without the Nest service):
+
+```bash
+docker compose exec admin-service php artisan migrate --path=database/migrations/shared
+docker compose exec admin-service php artisan migrate
+```
+
+Both frameworks produce an identical schema (verified by diffing `pg_dump --schema-only` of a database built by each).
+
 ## Day-to-day commands
 
 Run PHP tools inside the container:
