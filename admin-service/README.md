@@ -93,6 +93,16 @@ How a token is checked (`App\Services\JwtAuthService`): HS256 signature with `JW
 
 The figures are cached in Redis (`admin:dashboard:metrics`, cache DB 1) with stale-while-revalidate (`Cache::flexible`): fresh for 30 s, then the previous figures are served instantly for up to 5 minutes while one background refresh recomputes them. Because the Nest service also writes orders, a short lifetime is used instead of clearing the cache on every change; the page shows when its figures were computed.
 
+## Sales reports
+
+`/reports/sales` shows sales grouped by **day, week or month** for a date range (default: the last 30 days): orders, units sold, revenue and average order value per period, with totals. Periods without sales are listed with zeros, and the range is widened to whole periods (a monthly report from 15 Oct to 10 Nov covers all of October and November), so the rows always add up to the totals. A report covers at most 366 days, 260 weeks or 120 months.
+
+- **Download CSV** — one line per period plus a `TOTAL` line, plain numbers for spreadsheets.
+- **Download PDF** — an A4 report rendered with Dompdf (font subsetting keeps it around 20 KB). It is generated straight away: a report has at most a few hundred rows, which takes about a second, so a queued job would only add waiting.
+- `GET /admin/api/reports/sales?period=week&date_from=…&date_to=…` returns the same data as JSON.
+
+Revenue means the same as on the dashboard — both use `App\Repositories\SalesRepository`: orders that were paid and not cancelled, by payment time, in UTC.
+
 ## Users
 
 `/users` (and `/admin/api/users`) lists customers and admins (search, role filter, deleted users), and creates, edits, deletes and restores them. The rules match the Nest registration exactly, so accounts work in both services:

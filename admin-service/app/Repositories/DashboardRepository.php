@@ -11,46 +11,12 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Read-only aggregate queries. Everything returns plain arrays: the dashboard
- * caches them in Redis, and the cache only stores plain data, never objects.
+ * Read-only queries for the dashboard (revenue comes from SalesRepository).
+ * Everything returns plain arrays: the dashboard caches them in Redis, and the
+ * cache only stores plain data, never objects.
  */
 class DashboardRepository
 {
-    /** @return array{orders: int, revenue: string, average: string} orders paid in [$from, $to) */
-    public function revenueBetween(CarbonImmutable $from, CarbonImmutable $to): array
-    {
-        $row = Order::query()
-            ->whereIn('status', OrderStatus::revenueStatuses())
-            ->where('paid_at', '>=', $from)
-            ->where('paid_at', '<', $to)
-            ->selectRaw('count(*) AS orders, coalesce(sum(total), 0)::numeric(14, 2) AS revenue, coalesce(avg(total), 0)::numeric(14, 2) AS average')
-            ->toBase()
-            ->first();
-
-        return ['orders' => (int) $row->orders, 'revenue' => (string) $row->revenue, 'average' => (string) $row->average];
-    }
-
-    /**
-     * One row per day, including days without sales (generate_series).
-     *
-     * @return list<array{day: string, revenue: string}>
-     */
-    public function dailyRevenue(CarbonImmutable $fromDay, CarbonImmutable $toDay): array
-    {
-        $rows = DB::select(
-            "SELECT day::date AS day, coalesce(sum(o.total), 0)::numeric(14, 2) AS revenue
-             FROM generate_series(?::date, ?::date, interval '1 day') AS day
-             LEFT JOIN orders o
-               ON o.paid_at >= day AND o.paid_at < day + interval '1 day'
-              AND o.status IN (".implode(',', array_fill(0, count(OrderStatus::revenueStatuses()), '?')).')
-             GROUP BY day
-             ORDER BY day',
-            [$fromDay->toDateString(), $toDay->toDateString(), ...array_map(fn ($status) => $status->value, OrderStatus::revenueStatuses())],
-        );
-
-        return array_map(fn ($row) => ['day' => $row->day, 'revenue' => (string) $row->revenue], $rows);
-    }
-
     /** @return array<string, int> status => number of orders, every status included */
     public function ordersByStatus(): array
     {

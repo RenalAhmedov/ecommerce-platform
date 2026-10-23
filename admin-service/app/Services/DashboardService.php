@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Enums\ReportPeriod;
 use App\Repositories\DashboardRepository;
+use App\Repositories\SalesRepository;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Cache\Repository as Cache;
 
@@ -28,13 +30,14 @@ class DashboardService
 
     public function __construct(
         private readonly DashboardRepository $dashboard,
+        private readonly SalesRepository $sales,
         private readonly Cache $cache,
     ) {}
 
     /**
      * @return array{
      *     generatedAt: string,
-     *     revenue: array{today: array{orders: int, revenue: string, average: string}, week: array{orders: int, revenue: string, average: string}, month: array{orders: int, revenue: string, average: string}},
+     *     revenue: array{today: array{orders: int, units: int, revenue: string, average: string}, week: array{orders: int, units: int, revenue: string, average: string}, month: array{orders: int, units: int, revenue: string, average: string}},
      *     dailyRevenue: list<array{day: string, revenue: string}>,
      *     ordersByStatus: array<string, int>,
      *     customers: array{total: int, newSince: int},
@@ -58,11 +61,14 @@ class DashboardService
         return [
             'generatedAt' => $now->toIso8601String(),
             'revenue' => [
-                'today' => $this->dashboard->revenueBetween($today, $tomorrow),
-                'week' => $this->dashboard->revenueBetween($now->startOfWeek(), $tomorrow),
-                'month' => $this->dashboard->revenueBetween($now->startOfMonth(), $tomorrow),
+                'today' => $this->sales->summary($today, $tomorrow),
+                'week' => $this->sales->summary($now->startOfWeek(), $tomorrow),
+                'month' => $this->sales->summary($now->startOfMonth(), $tomorrow),
             ],
-            'dailyRevenue' => $this->dashboard->dailyRevenue($today->subDays(self::CHART_DAYS - 1), $today),
+            'dailyRevenue' => array_map(
+                fn (array $day) => ['day' => $day['period'], 'revenue' => $day['revenue']],
+                $this->sales->byPeriod(ReportPeriod::Day, $today->subDays(self::CHART_DAYS - 1), $tomorrow),
+            ),
             'ordersByStatus' => $this->dashboard->ordersByStatus(),
             'customers' => $this->dashboard->customerCounts($now->startOfMonth()),
             'lowStock' => $this->dashboard->lowStock(10),

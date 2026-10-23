@@ -4,11 +4,13 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProductImageController;
+use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth:jwt', 'admin', 'throttle:120,1'])->name('api.')->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+    Route::get('reports/sales', [ReportController::class, 'sales'])->name('reports.sales');
 
     Route::apiResource('products', ProductController::class);
     Route::patch('products/{product}/restore', [ProductController::class, 'restore'])

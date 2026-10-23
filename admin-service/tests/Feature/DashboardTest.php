@@ -46,9 +46,9 @@ class DashboardTest extends TestCase
 
         $revenue = $this->metrics()['revenue'];
 
-        $this->assertSame(['orders' => 1, 'revenue' => '100.00', 'average' => '100.00'], $revenue['today']);
-        $this->assertSame(['orders' => 2, 'revenue' => '150.00', 'average' => '75.00'], $revenue['week']);
-        $this->assertSame(['orders' => 3, 'revenue' => '180.00', 'average' => '60.00'], $revenue['month']);
+        $this->assertSame(['orders' => 1, 'units' => 0, 'revenue' => '100.00', 'average' => '100.00'], $revenue['today']);
+        $this->assertSame(['orders' => 2, 'units' => 0, 'revenue' => '150.00', 'average' => '75.00'], $revenue['week']);
+        $this->assertSame(['orders' => 3, 'units' => 0, 'revenue' => '180.00', 'average' => '60.00'], $revenue['month']);
     }
 
     public function test_the_chart_has_one_entry_per_day_including_quiet_days(): void

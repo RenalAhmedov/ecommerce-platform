@@ -7,6 +7,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductExportController;
 use App\Http\Controllers\ProductImageController;
 use App\Http\Controllers\ProductImportController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -38,6 +39,10 @@ Route::middleware(['auth', 'admin'])->group(function () {
     Route::patch('categories/{category}/restore', [CategoryController::class, 'restore'])
         ->withTrashed()
         ->name('categories.restore');
+
+    Route::get('reports/sales', [ReportController::class, 'index'])->name('reports.sales');
+    Route::get('reports/sales.csv', [ReportController::class, 'csv'])->name('reports.sales.csv');
+    Route::get('reports/sales.pdf', [ReportController::class, 'pdf'])->name('reports.sales.pdf');
 
     Route::resource('users', UserController::class)->except('show');
     Route::patch('users/{user}/restore', [UserController::class, 'restore'])

@@ -238,6 +238,21 @@ class ProductApiTest extends TestCase
             ->assertJsonStructure(['data' => ['generatedAt', 'revenue' => ['today', 'week', 'month'], 'dailyRevenue', 'ordersByStatus', 'customers', 'lowStock', 'topSellers', 'recentOrders']]);
     }
 
+    public function test_sales_report_as_json(): void
+    {
+        $this->api()->getJson('/admin/api/reports/sales?period=month&date_from=2026-01-01&date_to=2026-03-31')
+            ->assertOk()
+            ->assertJsonPath('data.period', 'month')
+            ->assertJsonPath('data.from', '2026-01-01')
+            ->assertJsonPath('data.to', '2026-03-31')
+            ->assertJsonCount(3, 'data.rows')
+            ->assertJsonPath('data.totals.revenue', '0.00');
+
+        $this->api()->getJson('/admin/api/reports/sales?period=day&date_from=2020-01-01&date_to=2026-01-01')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('date_to');
+    }
+
     public function test_users_through_the_api(): void
     {
         $this->api()->postJson('/admin/api/users', ['name' => 'Api User', 'email' => 'API@example.test', 'password' => 'secret-password', 'role' => 'customer'])
