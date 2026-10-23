@@ -39,7 +39,7 @@ describe('Auth (integration)', () => {
     const [user] = await testApp.query<{ password: string }>(
       'SELECT password FROM users',
     );
-    expect(user.password).toMatch(/^\$2[aby]\$12\$/);
+    expect(user.password).toMatch(/^\$2y\$12\$/);
   });
 
   it('answers 401 for a wrong password, an unknown email and a bad token', async () => {

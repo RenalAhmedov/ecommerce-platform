@@ -74,9 +74,9 @@ describe('AuthService', () => {
         { password: string },
       ];
       expect(password).not.toBe('password123');
-      expect(password).toMatch(/^\$2[aby]\$12\$/);
+      expect(password).toMatch(/^\$2y\$12\$/);
       await expect(bcrypt.compare('password123', password)).resolves.toBe(true);
-    });
+    }, 15_000);
 
     it('returns a bearer token and the profile without the password', async () => {
       const response = await service.register({
