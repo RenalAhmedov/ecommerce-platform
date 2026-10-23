@@ -10,4 +10,6 @@ export type NewProduct = Pick<
 
 export type ProductChanges = Partial<NewProduct>;
 
+export type PurchasableProduct = Pick<Product, 'id' | 'name' | 'price'>;
+
 export type UniqueProductValues = Partial<Pick<Product, 'sku' | 'slug'>>;

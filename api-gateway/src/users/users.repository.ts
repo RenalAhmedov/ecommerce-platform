@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { type EntityManager, Repository } from 'typeorm';
+import {
+  acquireAdvisoryLocks,
+  advisoryLockKeys,
+} from '../database/advisory-locks.js';
 import { User } from './entities/user.entity.js';
 
 @Injectable()
@@ -10,15 +14,19 @@ export class UsersRepository {
     private readonly repository: Repository<User>,
   ) {}
 
+  withManager(manager: EntityManager): UsersRepository {
+    return new UsersRepository(manager.getRepository(User));
+  }
+
   transaction<T>(work: (users: UsersRepository) => Promise<T>): Promise<T> {
     return this.repository.manager.transaction((manager) =>
-      work(new UsersRepository(manager.getRepository(User))),
+      work(this.withManager(manager)),
     );
   }
 
-  async lockEmail(email: string): Promise<void> {
-    await this.repository.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
-      `users.email:${email.toLowerCase()}`,
+  lockEmail(email: string): Promise<void> {
+    return acquireAdvisoryLocks(this.repository, [
+      advisoryLockKeys.userEmail(email),
     ]);
   }
 
@@ -37,6 +45,7 @@ export class UsersRepository {
   existsByEmail(email: string): Promise<boolean> {
     return this.repository
       .createQueryBuilder('user')
+      .withDeleted()
       .where('LOWER(user.email) = LOWER(:email)', { email })
       .getExists();
   }

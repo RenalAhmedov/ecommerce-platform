@@ -4,4 +4,10 @@ export interface JwtPayload {
   sub: number;
   email: string;
   role: UserRole;
+  jti: string;
+}
+
+export interface AccessTokenClaims extends JwtPayload {
+  iat: number;
+  exp: number;
 }

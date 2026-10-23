@@ -11,5 +11,11 @@ export interface EnvironmentVariables {
   JWT_EXPIRES_IN: number;
   REDIS_HOST: string;
   REDIS_PORT: number;
+  REDIS_DB: number;
   CACHE_TTL_SECONDS: number;
+  MAIL_HOST: string;
+  MAIL_PORT: number;
+  MAIL_FROM: string;
+  RATE_LIMIT_ENABLED: boolean;
+  CORS_ORIGINS: string;
 }

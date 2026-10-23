@@ -9,16 +9,22 @@ import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator.js';
 import type { AuthenticatedRequest } from '../interfaces/authenticated-request.interface.js';
-import type { JwtPayload } from '../interfaces/jwt-payload.interface.js';
+import type { AccessTokenClaims } from '../interfaces/jwt-payload.interface.js';
+import { RevokedTokenStore } from '../revoked-token.store.js';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   constructor(
     private readonly jwtService: JwtService,
     private readonly reflector: Reflector,
+    private readonly revokedTokenStore: RevokedTokenStore,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    if (context.getType() !== 'http') {
+      return true;
+    }
+
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -29,24 +35,38 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
-    const token = this.extractBearerToken(request);
+    const claims = await this.verify(this.extractBearerToken(request));
 
+    if (await this.revokedTokenStore.isRevoked(claims.jti)) {
+      throw new UnauthorizedException('Access token has been revoked');
+    }
+
+    request.user = claims;
+    return true;
+  }
+
+  private async verify(token: string | undefined): Promise<AccessTokenClaims> {
     if (!token) {
       throw new UnauthorizedException('Missing access token');
     }
 
+    let claims: AccessTokenClaims;
     try {
-      request.user = await this.jwtService.verifyAsync<JwtPayload>(token);
+      claims = await this.jwtService.verifyAsync<AccessTokenClaims>(token);
     } catch {
       throw new UnauthorizedException('Invalid or expired access token');
     }
 
-    return true;
+    if (!claims.jti) {
+      throw new UnauthorizedException('Invalid or expired access token');
+    }
+
+    return claims;
   }
 
   private extractBearerToken(request: Request): string | undefined {
-    const [type, token] = request.headers.authorization?.split(' ') ?? [];
+    const [scheme, token] = request.headers.authorization?.split(' ') ?? [];
 
-    return type === 'Bearer' ? token : undefined;
+    return scheme?.toLowerCase() === 'bearer' ? token : undefined;
   }
 }

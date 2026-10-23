@@ -1,25 +1,35 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import bcrypt from 'bcryptjs';
+import { randomUUID } from 'node:crypto';
 import type { EnvironmentVariables } from '../config/interfaces/environment-variables.interface.js';
 import { UserResponseDto } from '../users/dto/user-response.dto.js';
 import type { User } from '../users/entities/user.entity.js';
 import { UsersService } from '../users/users.service.js';
+import {
+  BCRYPT_ROUNDS,
+  UNKNOWN_USER_PASSWORD_HASH,
+} from './constants/auth.constants.js';
 import type { AuthResponseDto } from './dto/auth-response.dto.js';
 import type { LoginDto } from './dto/login.dto.js';
 import type { RegisterDto } from './dto/register.dto.js';
-import type { JwtPayload } from './interfaces/jwt-payload.interface.js';
-
-const BCRYPT_ROUNDS = 12;
-const UNKNOWN_USER_PASSWORD_HASH =
-  '$2b$12$SrBe8r37aBtFdLoLw9JwFeuMVboLs3lO2HAx43SNDHhwmY78aSBFm';
+import type {
+  AccessTokenClaims,
+  JwtPayload,
+} from './interfaces/jwt-payload.interface.js';
+import { RevokedTokenStore } from './revoked-token.store.js';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
+    private readonly revokedTokenStore: RevokedTokenStore,
     private readonly config: ConfigService<EnvironmentVariables, true>,
   ) {}
 
@@ -47,6 +57,17 @@ export class AuthService {
     return this.buildAuthResponse(user);
   }
 
+  async logout({ jti, exp }: AccessTokenClaims): Promise<void> {
+    try {
+      await this.revokedTokenStore.revoke(jti, exp);
+    } catch (error) {
+      throw new ServiceUnavailableException(
+        'Could not log out right now, please retry',
+        { cause: error },
+      );
+    }
+  }
+
   async getProfile(userId: number): Promise<UserResponseDto> {
     const user = await this.usersService.getById(userId);
 
@@ -58,6 +79,7 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       role: user.role,
+      jti: randomUUID(),
     };
 
     return {

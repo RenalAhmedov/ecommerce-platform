@@ -4,6 +4,7 @@ import {
   NestModule,
   ValidationPipe,
 } from '@nestjs/common';
+import { BullModule } from '@nestjs/bullmq';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_FILTER, APP_PIPE } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -14,7 +15,10 @@ import { RequestLoggerMiddleware } from './common/middleware/request-logger.midd
 import { validateEnv } from './config/env.validation.js';
 import type { EnvironmentVariables } from './config/interfaces/environment-variables.interface.js';
 import { createDataSourceOptions } from './database/database.config.js';
+import { createQueueConnectionOptions } from './messaging/queue-connection.options.js';
+import { OrdersModule } from './orders/orders.module.js';
 import { ProductsModule } from './products/products.module.js';
+import { RateLimitModule } from './rate-limit/rate-limit.module.js';
 
 @Module({
   imports: [
@@ -34,9 +38,17 @@ import { ProductsModule } from './products/products.module.js';
           DB_LOGGING: config.get('DB_LOGGING'),
         }),
     }),
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<EnvironmentVariables, true>) => ({
+        connection: createQueueConnectionOptions(config),
+      }),
+    }),
     CacheModule,
     AuthModule,
+    RateLimitModule,
     ProductsModule,
+    OrdersModule,
   ],
   providers: [
     {

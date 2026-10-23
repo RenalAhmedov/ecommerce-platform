@@ -15,7 +15,7 @@ import { createRedisClient } from './redis-client.factory.js';
     },
     CacheService,
   ],
-  exports: [CacheService],
+  exports: [CacheService, REDIS_CLIENT],
 })
 export class CacheModule implements OnApplicationShutdown {
   constructor(@Inject(REDIS_CLIENT) private readonly redis: Redis) {}

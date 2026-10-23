@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { InventoryMovement } from '../inventory/entities/inventory-movement.entity.js';
-import { Inventory } from '../inventory/entities/inventory.entity.js';
-import { InventoryMovementReason } from '../inventory/enums/inventory-movement-reason.enum.js';
+import { type EntityManager, Repository } from 'typeorm';
+import {
+  acquireAdvisoryLocks,
+  advisoryLockKeys,
+} from '../database/advisory-locks.js';
 import { PRODUCT_COLUMNS } from './constants/product-query.constants.js';
 import type { ProductQueryDto } from './dto/product-query.dto.js';
 import { Product } from './entities/product.entity.js';
@@ -12,6 +13,7 @@ import type {
   NewProduct,
   ProductChanges,
   ProductsQuery,
+  PurchasableProduct,
   UniqueProductValues,
 } from './types/product.types.js';
 
@@ -22,12 +24,25 @@ export class ProductsRepository {
     private readonly repository: Repository<Product>,
   ) {}
 
+  withManager(manager: EntityManager): ProductsRepository {
+    return new ProductsRepository(manager.getRepository(Product));
+  }
+
   transaction<T>(
-    work: (products: ProductsRepository) => Promise<T>,
+    work: (products: ProductsRepository, manager: EntityManager) => Promise<T>,
   ): Promise<T> {
     return this.repository.manager.transaction((manager) =>
-      work(new ProductsRepository(manager.getRepository(Product))),
+      work(this.withManager(manager), manager),
     );
+  }
+
+  findPurchasableByIds(ids: number[]): Promise<PurchasableProduct[]> {
+    return this.repository
+      .createQueryBuilder('product')
+      .select(['product.id', 'product.name', 'product.price'])
+      .where('product.id IN (:...ids)', { ids })
+      .andWhere('product.isActive = true')
+      .getMany();
   }
 
   async lockById(id: number): Promise<boolean> {
@@ -41,18 +56,13 @@ export class ProductsRepository {
     return product !== null;
   }
 
-  async lockUniqueValues(values: UniqueProductValues): Promise<void> {
-    const lockKeys = Object.entries(values)
-      .filter(([, value]) => value !== undefined)
-      .map(([column, value]) => `products.${column}:${value}`)
-      .sort();
+  lockUniqueValues({ sku, slug }: UniqueProductValues): Promise<void> {
+    const keys = [
+      sku === undefined ? null : advisoryLockKeys.productSku(sku),
+      slug === undefined ? null : advisoryLockKeys.productSlug(slug),
+    ].filter((key) => key !== null);
 
-    for (const lockKey of lockKeys) {
-      await this.repository.query(
-        'SELECT pg_advisory_xact_lock(hashtext($1))',
-        [lockKey],
-      );
-    }
+    return acquireAdvisoryLocks(this.repository, keys);
   }
 
   findActivePaginated(filters: ProductQueryDto): Promise<[Product[], number]> {
@@ -67,10 +77,10 @@ export class ProductsRepository {
       .getOne();
   }
 
-  findById(id: number): Promise<Product | null> {
+  getById(id: number): Promise<Product> {
     return this.createProductsQuery()
       .where('product.id = :id', { id })
-      .getOne();
+      .getOneOrFail();
   }
 
   existsBySku(sku: string, excludeId?: number): Promise<boolean> {
@@ -81,30 +91,8 @@ export class ProductsRepository {
     return this.existsByColumn('slug', slug, excludeId);
   }
 
-  createWithInventory(
-    data: NewProduct,
-    initialStock: number,
-    createdBy: number,
-  ): Promise<Product> {
-    return this.repository.manager.transaction(async (manager) => {
-      const product = await manager.save(manager.create(Product, data));
-
-      await manager.insert(Inventory, {
-        productId: product.id,
-        quantity: initialStock,
-      });
-
-      if (initialStock > 0) {
-        await manager.insert(InventoryMovement, {
-          productId: product.id,
-          userId: createdBy,
-          change: initialStock,
-          reason: InventoryMovementReason.Initial,
-        });
-      }
-
-      return product;
-    });
+  create(data: NewProduct): Promise<Product> {
+    return this.repository.save(this.repository.create(data));
   }
 
   async update(id: number, changes: ProductChanges): Promise<void> {

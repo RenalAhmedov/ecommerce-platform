@@ -1,0 +1,1 @@
+export const MAX_ORDER_TOTAL_CENTS = 999_999_999_999;
