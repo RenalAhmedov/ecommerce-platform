@@ -150,6 +150,21 @@ Categories form a tree through `parent_id` (Electronics › Computers › Laptop
 - a subcategory can only be restored after its parent;
 - slugs stay reserved by trashed categories, like product SKUs.
 
+## Catalogue sync with the api-gateway
+
+The Nest api-gateway caches product responses in Redis. When this service changes the catalogue — products (created, updated, deleted, restored), product images, categories, or stock returned by a cancelled order — it tells the gateway through its internal webhook, so the shop shows the change at once:
+
+```
+ProductService / CategoryService / ProductImageService / OrderService
+  └─ after the transaction commits → CatalogNotifier → queued NotifyCatalogChanged job
+        └─ admin-worker → POST {NEST_API_URL}/api/internal/webhooks/catalog   (X-Api-Key: INTERNAL_API_KEY)
+```
+
+- **Queued, with retries** (6 attempts over about 10 minutes), so the panel never waits for the gateway and a gateway restart loses nothing. If every attempt fails the job lands in `failed_jobs`, and the gateway still catches up when its cache entries expire (60 s).
+- **One webhook per burst**: the job is unique until it starts, so an import of 2000 rows sends one notification, not 2000. Changes made while it is being sent queue the next one, so none is missed.
+- **Same event id on every retry**, so the gateway recognises a redelivery and handles it once.
+- Configure `NEST_API_URL` (default `http://host.docker.internal:3000`, the gateway running on your machine) and `INTERNAL_API_KEY` (the same value as in `api-gateway/.env`) in `.env`. An empty `NEST_API_URL` turns the webhook off.
+
 ## Product images
 
 Uploading an image (edit page, or `POST /admin/api/products/{id}/image` as multipart `image`) only stores the original on the private disk and queues `App\Jobs\ProcessProductImage`; the request returns at once (the API answers **202**). The `admin-worker` then:

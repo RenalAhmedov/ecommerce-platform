@@ -6,6 +6,7 @@ use App\Jobs\ProcessProductImage;
 use App\Models\Product;
 use App\Repositories\ProductImageRepository;
 use App\Repositories\ProductRepository;
+use App\Services\CatalogNotifier;
 use App\Services\ProductImageService;
 use App\Support\ImageResizer;
 use Illuminate\Http\UploadedFile;
@@ -15,6 +16,8 @@ use Tests\Unit\UnitTestCase;
 
 class ProductImageServiceTest extends UnitTestCase
 {
+    private CatalogNotifier&MockInterface $catalog;
+
     private const UPLOAD = 'product-image-uploads/new.jpg';
 
     private ProductRepository&MockInterface $products;
@@ -32,6 +35,8 @@ class ProductImageServiceTest extends UnitTestCase
         $this->products = $this->mock(ProductRepository::class);
         $this->images = $this->mock(ProductImageRepository::class);
         $this->resizer = $this->mock(ImageResizer::class);
+        $this->catalog = $this->mock(CatalogNotifier::class);
+        $this->catalog->shouldReceive('catalogChanged')->byDefault();
         $this->service = app(ProductImageService::class);
     }
 
@@ -74,6 +79,7 @@ class ProductImageServiceTest extends UnitTestCase
         $this->images->shouldReceive('clearPending')->once()->with(42);
         $this->images->shouldReceive('deleteImage')->once()->with('products/42/old.webp');
         $this->images->shouldReceive('deleteUpload')->once()->with(self::UPLOAD);
+        $this->catalog->shouldReceive('catalogChanged')->once()->with('product image changed');
 
         $this->service->process(42, self::UPLOAD);
 
@@ -98,6 +104,7 @@ class ProductImageServiceTest extends UnitTestCase
         $this->givenResizedImages();
         $this->products->shouldReceive('lockByIdWithTrashed')->andReturn($this->product('products/42/old.webp'));
         $this->products->shouldNotReceive('save');
+        $this->catalog->shouldNotReceive('catalogChanged');
         $this->images->shouldReceive('deleteImage')->once()->with('products/42/new.webp');
         $this->images->shouldReceive('deleteUpload')->once()->with(self::UPLOAD);
 
@@ -132,6 +139,7 @@ class ProductImageServiceTest extends UnitTestCase
         $this->products->shouldReceive('lockById')->with(42)->andReturn($product);
         $this->products->shouldReceive('save')->once()->with($product);
         $this->images->shouldReceive('deleteImage')->once()->with('products/42/old.webp');
+        $this->catalog->shouldReceive('catalogChanged')->once()->with('product image removed');
 
         $this->assertNull($this->service->remove($product)->image_path);
     }

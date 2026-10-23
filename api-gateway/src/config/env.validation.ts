@@ -17,6 +17,8 @@ const envValidationSchema = Joi.object<EnvironmentVariables>({
   JWT_SECRET: Joi.string().min(32).required(),
   JWT_EXPIRES_IN: Joi.number().integer().positive().default(3600),
 
+  INTERNAL_API_KEY: Joi.string().min(32).required(),
+
   REDIS_HOST: Joi.string().default('localhost'),
   REDIS_PORT: Joi.number().port().default(6379),
   REDIS_DB: Joi.number().integer().min(0).max(15).default(0),

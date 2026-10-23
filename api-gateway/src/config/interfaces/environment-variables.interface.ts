@@ -9,6 +9,7 @@ export interface EnvironmentVariables {
   DB_LOGGING: boolean;
   JWT_SECRET: string;
   JWT_EXPIRES_IN: number;
+  INTERNAL_API_KEY: string;
   REDIS_HOST: string;
   REDIS_PORT: number;
   REDIS_DB: number;

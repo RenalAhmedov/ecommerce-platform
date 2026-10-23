@@ -6,6 +6,7 @@ use App\Enums\OrderStatus;
 use App\Models\Order;
 use App\Models\User;
 use App\Repositories\OrderRepository;
+use App\Services\CatalogNotifier;
 use App\Services\InventoryService;
 use App\Services\OrderService;
 use Illuminate\Validation\ValidationException;
@@ -14,6 +15,8 @@ use Tests\Unit\UnitTestCase;
 
 class OrderServiceTest extends UnitTestCase
 {
+    private CatalogNotifier&MockInterface $catalog;
+
     private OrderRepository&MockInterface $orders;
 
     private InventoryService&MockInterface $inventory;
@@ -28,6 +31,8 @@ class OrderServiceTest extends UnitTestCase
 
         $this->orders = $this->mock(OrderRepository::class);
         $this->inventory = $this->mock(InventoryService::class);
+        $this->catalog = $this->mock(CatalogNotifier::class);
+        $this->catalog->shouldReceive('catalogChanged')->byDefault();
         $this->service = app(OrderService::class);
         $this->admin = User::factory()->admin()->make(['id' => 1]);
     }
@@ -47,6 +52,7 @@ class OrderServiceTest extends UnitTestCase
         $this->orders->shouldReceive('lockById')->once()->with(10)->andReturn($locked);
         $this->orders->shouldReceive('save')->once()->with($locked);
         $this->inventory->shouldNotReceive('release');
+        $this->catalog->shouldNotReceive('catalogChanged');
 
         $result = $this->service->changeStatus($this->order(OrderStatus::Paid), OrderStatus::Processing, $this->admin);
 
@@ -75,6 +81,7 @@ class OrderServiceTest extends UnitTestCase
         $this->orders->shouldReceive('quantitiesByProduct')->with($locked)->andReturn([5 => 2, 3 => 1]);
         $this->inventory->shouldReceive('release')->once()->with([5 => 2, 3 => 1], 10, $this->admin)->ordered();
         $this->orders->shouldReceive('save')->once()->ordered();
+        $this->catalog->shouldReceive('catalogChanged')->once()->with('order cancelled, stock returned');
 
         $this->assertSame(OrderStatus::Cancelled, $this->service->changeStatus($locked, OrderStatus::Cancelled, $this->admin)->status);
     }

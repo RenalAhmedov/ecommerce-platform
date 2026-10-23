@@ -5,6 +5,7 @@ namespace Tests\Unit\Services;
 use App\Models\Product;
 use App\Models\User;
 use App\Repositories\ProductRepository;
+use App\Services\CatalogNotifier;
 use App\Services\InventoryService;
 use App\Services\ProductService;
 use Illuminate\Validation\ValidationException;
@@ -14,6 +15,8 @@ use Tests\Unit\UnitTestCase;
 
 class ProductServiceTest extends UnitTestCase
 {
+    private CatalogNotifier&MockInterface $catalog;
+
     private ProductRepository&MockInterface $products;
 
     private InventoryService&MockInterface $inventory;
@@ -26,6 +29,8 @@ class ProductServiceTest extends UnitTestCase
 
         $this->products = $this->mock(ProductRepository::class);
         $this->inventory = $this->mock(InventoryService::class);
+        $this->catalog = $this->mock(CatalogNotifier::class);
+        $this->catalog->shouldReceive('catalogChanged')->byDefault();
         $this->service = app(ProductService::class);
     }
 
@@ -41,6 +46,7 @@ class ProductServiceTest extends UnitTestCase
             ->with(['name' => 'Mug', 'sku' => 'MUG-1', 'slug' => 'mug', 'price' => '5'])
             ->andReturn($product)->ordered();
         $this->inventory->shouldReceive('initializeStock')->once()->with(42, 10, $admin);
+        $this->catalog->shouldReceive('catalogChanged')->once()->with('product created');
 
         $result = $this->service->create(
             ['name' => 'Mug', 'sku' => 'MUG-1', 'slug' => 'mug', 'price' => '5', 'initial_stock' => 10],
@@ -57,6 +63,7 @@ class ProductServiceTest extends UnitTestCase
         $this->products->shouldReceive('existsBySlug')->andReturnTrue();
         $this->products->shouldNotReceive('create');
         $this->inventory->shouldNotReceive('initializeStock');
+        $this->catalog->shouldNotReceive('catalogChanged');
 
         try {
             $this->service->create(['name' => 'Mug', 'sku' => 'MUG-1', 'slug' => 'mug', 'price' => '5'], User::factory()->make());

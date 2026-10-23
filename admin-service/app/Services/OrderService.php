@@ -16,6 +16,7 @@ class OrderService
     public function __construct(
         private readonly OrderRepository $orders,
         private readonly InventoryService $inventory,
+        private readonly CatalogNotifier $catalog,
     ) {}
 
     /**
@@ -42,7 +43,7 @@ class OrderService
      */
     public function changeStatus(Order $order, OrderStatus $status, User $admin): Order
     {
-        return DB::transaction(function () use ($order, $status, $admin) {
+        $order = DB::transaction(function () use ($order, $status, $admin) {
             $order = $this->orders->lockById($order->id);
 
             if (! $order->status->canMoveTo($status)) {
@@ -69,5 +70,12 @@ class OrderService
 
             return $order;
         });
+
+        // Returned stock changes the products' "stock" in the shop's cached responses.
+        if ($status === OrderStatus::Cancelled) {
+            $this->catalog->catalogChanged('order cancelled, stock returned');
+        }
+
+        return $order;
     }
 }

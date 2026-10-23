@@ -47,6 +47,9 @@ services:
       - ./admin-service:/var/www/html
     ports:
       - "127.0.0.1:${ADMIN_PORT:-8000}:8000"
+    # Reaches the Nest api-gateway running on the host (Docker Desktop has this name built in; Linux needs the mapping).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy

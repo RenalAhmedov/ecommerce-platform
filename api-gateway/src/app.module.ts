@@ -19,6 +19,7 @@ import { createQueueConnectionOptions } from './messaging/queue-connection.optio
 import { OrdersModule } from './orders/orders.module.js';
 import { ProductsModule } from './products/products.module.js';
 import { RateLimitModule } from './rate-limit/rate-limit.module.js';
+import { WebhooksModule } from './webhooks/webhooks.module.js';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { RateLimitModule } from './rate-limit/rate-limit.module.js';
     RateLimitModule,
     ProductsModule,
     OrdersModule,
+    WebhooksModule,
   ],
   providers: [
     {

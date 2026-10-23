@@ -22,6 +22,14 @@ Interactive Swagger UI: **http://localhost:3000/api/docs** (raw OpenAPI JSON at 
 - **Security headers** via `helmet` (CSP, HSTS, no-sniff, frame protection, no `X-Powered-By`).
 - **CORS** is off unless `CORS_ORIGINS` lists allowed browser origins (comma-separated).
 
+## Catalogue sync from the admin service
+
+Products, categories and stock are also changed by the Laravel admin service, directly in the shared database. It then calls **`POST /api/internal/webhooks/catalog`** (body `{ eventId, type: "catalog.changed", occurredAt }`), and this API drops its cached product responses at once instead of after their TTL.
+
+- Authenticated with the shared **`INTERNAL_API_KEY`** in the `X-Api-Key` header (at least 32 characters, the same value in both services' `.env`). No JWT is accepted on this route, and the key is compared in constant time.
+- Each `eventId` is remembered in Redis for a day (`webhook:event:<id>`, `SET NX`), so a retried delivery is answered `202 {"status":"duplicate"}` and handled once.
+- Answers `202 {"status":"processed"}`. Shown in Swagger under **Internal** (authorize with the API key).
+
 ## Database migrations
 
 ```bash
