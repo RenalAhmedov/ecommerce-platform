@@ -10,8 +10,8 @@ use Mockery\MockInterface;
 
 /**
  * API tests call the admin API with access tokens built exactly like the Nest
- * api-gateway builds them. The revocation check is mocked (no token is revoked
- * unless a test says so); RevokedTokenRepositoryTest covers the real Redis key.
+ * api-gateway builds them. The token denylist is mocked (no token is revoked
+ * unless a test says so); RevokedTokenRepositoryTest covers the real Redis keys.
  * Laravel runs setUpAuthenticatesWithNestToken() before every test.
  */
 trait AuthenticatesWithNestToken
@@ -25,6 +25,7 @@ trait AuthenticatesWithNestToken
         $this->admin = User::factory()->admin()->create();
         $this->revokedTokens = $this->mock(RevokedTokenRepository::class);
         $this->revokedTokens->shouldReceive('isRevoked')->andReturnFalse()->byDefault();
+        $this->revokedTokens->shouldReceive('revokeAllForUser')->byDefault();
     }
 
     /** @param  array<string, mixed>  $overrides  claims to change; null removes a claim */
@@ -43,9 +44,14 @@ trait AuthenticatesWithNestToken
         return JWT::encode(array_filter($claims, fn ($value) => $value !== null), $secret ?? config('auth.jwt.secret'), 'HS256');
     }
 
-    /** Calls the API as the admin, or with the given token. */
+    /**
+     * Calls the API as the admin, or with the given token. The guard is reset so
+     * every call authenticates again, like a real client's next request would.
+     */
     protected function api(?string $token = null): static
     {
+        $this->app['auth']->forgetGuards();
+
         return $this->withToken($token ?? $this->tokenFor($this->admin));
     }
 }

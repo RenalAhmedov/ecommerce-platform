@@ -5,15 +5,19 @@ namespace Tests\Unit\Services;
 use App\Enums\UserRole;
 use App\Models\User;
 use App\Repositories\UserRepository;
+use App\Services\JwtAuthService;
 use App\Services\UserService;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Mockery\MockInterface;
+use RedisException;
 use Tests\Unit\UnitTestCase;
 
 class UserServiceTest extends UnitTestCase
 {
     private UserRepository&MockInterface $users;
+
+    private JwtAuthService&MockInterface $tokens;
 
     private UserService $service;
 
@@ -24,6 +28,7 @@ class UserServiceTest extends UnitTestCase
         parent::setUp();
 
         $this->users = $this->mock(UserRepository::class);
+        $this->tokens = $this->mock(JwtAuthService::class);
         $this->service = app(UserService::class);
         $this->actor = $this->user(1, UserRole::Admin);
     }
@@ -80,6 +85,7 @@ class UserServiceTest extends UnitTestCase
         $this->users->shouldReceive('lockEmail')->once()->with('new@example.test');
         $this->users->shouldReceive('existsByEmail')->once()->with('new@example.test', 5)->andReturnFalse();
         $this->users->shouldReceive('save')->once()->with($user);
+        $this->tokens->shouldNotReceive('revokeAllForUser');
 
         $this->assertSame('new@example.test', $this->service->update($user, ['email' => 'new@example.test'], $this->actor)->email);
     }
@@ -95,11 +101,12 @@ class UserServiceTest extends UnitTestCase
         $this->service->update($user, ['name' => 'Renamed', 'email' => 'same@example.test'], $this->actor);
     }
 
-    public function test_a_new_password_is_hashed_and_renews_the_remember_token(): void
+    public function test_a_new_password_is_hashed_renews_the_remember_token_and_kills_access_tokens(): void
     {
         $user = $this->user(5, UserRole::Customer);
         $this->givenLocked($user);
-        $this->users->shouldReceive('save')->once();
+        $this->users->shouldReceive('save')->once()->ordered();
+        $this->tokens->shouldReceive('revokeAllForUser')->once()->with(5)->ordered();
 
         $this->service->update($user, ['password' => 'brand-new-password'], $this->actor);
 
@@ -113,6 +120,7 @@ class UserServiceTest extends UnitTestCase
         $password = $user->password;
         $this->givenLocked($user);
         $this->users->shouldReceive('save')->once();
+        $this->tokens->shouldNotReceive('revokeAllForUser');
 
         $this->service->update($user, ['password' => null], $this->actor);
 
@@ -128,13 +136,14 @@ class UserServiceTest extends UnitTestCase
         $this->expectError('role', 'You cannot demote your own admin account.', fn () => $this->service->update($this->actor, ['role' => 'customer'], $this->actor));
     }
 
-    public function test_demoting_another_admin_takes_the_roster_lock(): void
+    public function test_demoting_another_admin_takes_the_roster_lock_and_kills_their_access_tokens(): void
     {
         $other = $this->user(2, UserRole::Admin);
         $this->givenLocked($other);
         $this->users->shouldReceive('lockAdminRoster')->once()->ordered();
         $this->users->shouldReceive('countAdmins')->once()->andReturn(2)->ordered();
         $this->users->shouldReceive('save')->once()->ordered();
+        $this->tokens->shouldReceive('revokeAllForUser')->once()->with(2)->ordered();
 
         $this->assertSame(UserRole::Customer, $this->service->update($other, ['role' => 'customer'], $this->actor)->role);
     }
@@ -156,6 +165,7 @@ class UserServiceTest extends UnitTestCase
         $this->givenLocked($customer);
         $this->users->shouldNotReceive('lockAdminRoster');
         $this->users->shouldReceive('save')->once();
+        $this->tokens->shouldReceive('revokeAllForUser')->once()->with(3);
 
         $this->assertSame(UserRole::Admin, $this->service->update($customer, ['role' => 'admin'], $this->actor)->role);
     }
@@ -168,22 +178,35 @@ class UserServiceTest extends UnitTestCase
         $this->expectError('user', 'You cannot delete your own admin account.', fn () => $this->service->delete($this->actor, $this->actor));
     }
 
-    public function test_deleting_a_customer_needs_no_roster_check(): void
+    public function test_deleting_a_customer_needs_no_roster_check_and_kills_their_access_tokens(): void
     {
         $customer = $this->user(3, UserRole::Customer);
         $this->givenLocked($customer);
         $this->users->shouldNotReceive('lockAdminRoster');
-        $this->users->shouldReceive('delete')->once()->with($customer);
+        $this->users->shouldReceive('delete')->once()->with($customer)->ordered();
+        $this->tokens->shouldReceive('revokeAllForUser')->once()->with(3)->ordered();
 
         $this->service->delete($customer, $this->actor);
     }
 
-    public function test_a_password_reset_renews_the_remember_token(): void
+    public function test_a_password_reset_renews_the_remember_token_and_kills_access_tokens(): void
     {
         $user = $this->user(3, UserRole::Admin);
         $this->users->shouldReceive('updatePasswordAndRememberToken')->once()
             ->withArgs(fn (User $target, string $password, string $token) => $target === $user && $password === 'new-password' && strlen($token) === 60);
+        $this->tokens->shouldReceive('revokeAllForUser')->once()->with(3);
 
         $this->service->resetPassword($user, 'new-password');
+    }
+
+    public function test_a_password_change_fails_when_the_tokens_cannot_be_revoked(): void
+    {
+        $user = $this->user(3, UserRole::Admin);
+        $this->users->shouldReceive('updatePasswordAndRememberToken')->once();
+        $this->tokens->shouldReceive('revokeAllForUser')->andThrow(new RedisException('Connection refused'));
+
+        $this->expectException(RedisException::class);
+
+        $this->service->changePassword($user, 'new-password');
     }
 }

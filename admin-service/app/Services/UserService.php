@@ -15,7 +15,10 @@ use Illuminate\Validation\ValidationException;
 
 class UserService
 {
-    public function __construct(private readonly UserRepository $users) {}
+    public function __construct(
+        private readonly UserRepository $users,
+        private readonly JwtAuthService $tokens,
+    ) {}
 
     /**
      * @param  array{search?: ?string, role?: ?string, trashed?: bool|string|null}  $filters
@@ -49,7 +52,8 @@ class UserService
 
     /**
      * An empty password keeps the current one. A new password also renews the
-     * remember token, which signs the user out of "remember me" sessions.
+     * remember token, which signs the user out of "remember me" sessions. A new
+     * password or role kills the user's access tokens in both services.
      *
      * @param  array{name?: string, email?: string, password?: ?string, role?: string}  $data
      */
@@ -79,7 +83,12 @@ class UserService
 
             $changed = array_values(array_diff(array_keys($user->getDirty()), ['password', 'remember_token']));
             $passwordChanged = $user->isDirty('password');
+            $roleChanged = $user->isDirty('role');
             $this->users->save($user);
+
+            if ($passwordChanged || $roleChanged) {
+                $this->tokens->revokeAllForUser($user->id);
+            }
 
             if ($changed !== [] || $passwordChanged) {
                 Log::info('User updated', ['target_user_id' => $user->id, 'changed' => $changed, 'password_changed' => $passwordChanged]);
@@ -89,7 +98,7 @@ class UserService
         });
     }
 
-    /** Orders keep pointing at a deleted user; restoring brings the account back with them. */
+    /** Orders keep pointing at a deleted user; restoring brings the account back with them. Their access tokens die. */
     public function delete(User $user, User $actor): void
     {
         DB::transaction(function () use ($user, $actor) {
@@ -100,6 +109,7 @@ class UserService
             }
 
             $this->users->delete($user);
+            $this->tokens->revokeAllForUser($user->id);
 
             Log::info('User deleted', ['target_user_id' => $user->id, 'role' => $user->role->value]);
         });
@@ -113,21 +123,29 @@ class UserService
         Log::info('User restored', ['target_user_id' => $user->id]);
     }
 
-    /** Also renews the remember token, which signs out "remember me" sessions on other devices. */
+    /** Signs the user out of "remember me" sessions on other devices and kills their access tokens. */
     public function changePassword(User $user, string $password): void
     {
-        $this->users->updatePasswordAndRememberToken($user, $password, Str::random(60));
+        $this->replacePassword($user, $password);
 
         Log::info('Password changed', ['target_user_id' => $user->id]);
     }
 
-    /** A new remember token signs the user out of "remember me" sessions on other devices. */
+    /** Signs the user out of "remember me" sessions on other devices and kills their access tokens. */
     public function resetPassword(User $user, string $password): void
     {
-        $this->users->updatePasswordAndRememberToken($user, $password, Str::random(60));
+        $this->replacePassword($user, $password);
         event(new PasswordReset($user));
 
         Log::info('Password reset completed', ['target_user_id' => $user->id]);
+    }
+
+    private function replacePassword(User $user, string $password): void
+    {
+        DB::transaction(function () use ($user, $password) {
+            $this->users->updatePasswordAndRememberToken($user, $password, Str::random(60));
+            $this->tokens->revokeAllForUser($user->id);
+        });
     }
 
     /** @throws ValidationException */

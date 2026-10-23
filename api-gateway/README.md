@@ -18,7 +18,8 @@ Interactive Swagger UI: **http://localhost:3000/api/docs** (raw OpenAPI JSON at 
 ## Security
 
 - **Rate limiting** (stored in Redis, shared by all instances): login 5/min, register 3/min, place order 10/min, everything else 100/min. Logged-in users are limited per user, anonymous requests per IP. Over the limit: `429` with a `Retry-After` header. If Redis is down, requests are allowed. Disable with `RATE_LIMIT_ENABLED=false`.
-- **Logout revokes the token**: every JWT carries a unique `jti`; `POST /api/auth/logout` stores it in Redis (`auth:revoked-token:<jti>`) until the token would expire, and revoked tokens get `401`. Other sessions of the same user keep working.
+- **Logout revokes the token**: every JWT carries a unique `jti`; `POST /api/auth/logout` stores it in Redis (`auth:revoked-token:<jti>`) until the token would expire, and revoked tokens get `401`. Other sessions of the same user keep working. The admin service reads the same key, and its `POST /admin/api/auth/logout` writes it, so a logout counts in both services.
+- **Tokens die with the account**: when the admin service deletes a user, changes their role or sets a new password, it writes `auth:user-tokens-valid-after:<userId>` (unix time); the guard rejects that user's tokens issued before it (`401`), checking both keys in one Redis round trip. Tokens must have an `iat`, and `JWT_EXPIRES_IN` is capped at a day so a cutoff always outlives the tokens it kills.
 - **Security headers** via `helmet` (CSP, HSTS, no-sniff, frame protection, no `X-Powered-By`).
 - **CORS** is off unless `CORS_ORIGINS` lists allowed browser origins (comma-separated).
 

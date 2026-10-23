@@ -5,9 +5,12 @@ namespace Tests\Feature\Users;
 use App\Enums\UserRole;
 use App\Models\Order;
 use App\Models\User;
+use App\Repositories\RevokedTokenRepository;
 use App\Services\UserService;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Redis;
 use Illuminate\Validation\ValidationException;
+use RedisException;
 use Tests\Feature\FeatureTestCase;
 
 class UserManagementTest extends FeatureTestCase
@@ -164,6 +167,39 @@ class UserManagementTest extends FeatureTestCase
 
         $this->actingAs($this->admin)->patch("/users/{$customer->id}/restore")->assertRedirect('/users');
         $this->assertNotSoftDeleted($customer);
+    }
+
+    /** The api-gateway reads the same key, so these users lose their tokens there too. */
+    public function test_deleting_demoting_or_a_new_password_kills_the_users_access_tokens(): void
+    {
+        [$deleted, $demoted, $newPassword, $renamed] = [User::factory()->create(), User::factory()->admin()->create(), User::factory()->create(), User::factory()->create()];
+
+        $this->actingAs($this->admin)->delete("/users/{$deleted->id}");
+        $this->actingAs($this->admin)->put("/users/{$demoted->id}", ['role' => 'customer']);
+        $this->actingAs($this->admin)->put("/users/{$newPassword->id}", ['password' => 'brand-new-password']);
+        $this->actingAs($this->admin)->put("/users/{$renamed->id}", ['name' => 'Renamed']);
+
+        $cutoffs = Redis::connection('shared')->mget(array_map(
+            fn (User $user) => "auth:user-tokens-valid-after:{$user->id}",
+            [$deleted, $demoted, $newPassword, $renamed],
+        ));
+        $this->assertEqualsWithDelta(time(), (int) $cutoffs[0], 2);
+        $this->assertEqualsWithDelta(time(), (int) $cutoffs[1], 2);
+        $this->assertEqualsWithDelta(time(), (int) $cutoffs[2], 2);
+        $this->assertNull($cutoffs[3]);
+    }
+
+    public function test_a_user_change_is_rolled_back_when_their_tokens_cannot_be_revoked(): void
+    {
+        $customer = User::factory()->create();
+        $this->mock(RevokedTokenRepository::class)->shouldReceive('revokeAllForUser')->andThrow(new RedisException('Connection refused'));
+
+        try {
+            app(UserService::class)->delete($customer, $this->admin);
+            $this->fail('The user was deleted although their tokens stayed valid.');
+        } catch (RedisException) {
+            $this->assertNotSoftDeleted($customer);
+        }
     }
 
     public function test_admin_login_and_password_reset_ignore_email_case(): void

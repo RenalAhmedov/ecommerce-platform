@@ -15,7 +15,8 @@ const envValidationSchema = Joi.object<EnvironmentVariables>({
   DB_LOGGING: Joi.boolean().default(false),
 
   JWT_SECRET: Joi.string().min(32).required(),
-  JWT_EXPIRES_IN: Joi.number().integer().positive().default(3600),
+  // At most a day: the admin service keeps a user's token cutoff for a day.
+  JWT_EXPIRES_IN: Joi.number().integer().positive().max(86_400).default(3600),
 
   INTERNAL_API_KEY: Joi.string().min(32).required(),
 

@@ -128,6 +128,27 @@ describe('Auth (integration)', () => {
     expect(ttl).toBeLessThanOrEqual(3_600);
   });
 
+  it('refuses the tokens a user held before the admin service cut them off', async () => {
+    const { id, token } = await testApp.signUp('ada@example.test');
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const cutOffAt = async (unixTime: number) => {
+      await testApp.redis.set(
+        `auth:user-tokens-valid-after:${id}`,
+        String(unixTime),
+      );
+      return testApp.request('GET', '/auth/me', { token });
+    };
+
+    const cutOffBefore = await cutOffAt(issuedAt - 60);
+    const cutOffAfter = await cutOffAt(issuedAt + 60);
+
+    expect(cutOffBefore.status).toBe(200);
+    expect(cutOffAfter.status).toBe(401);
+    expect(cutOffAfter.body).toMatchObject({
+      message: 'Access token has been revoked',
+    });
+  });
+
   it('cannot log out twice with the same token', async () => {
     const { token } = await testApp.signUp('ada@example.test');
 

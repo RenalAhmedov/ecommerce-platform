@@ -78,6 +78,7 @@ curl -H "Authorization: Bearer $TOKEN" -H "Accept: application/json" "http://loc
 
 | Method | Path | Notes |
 |---|---|---|
+| POST | `/admin/api/auth/logout` | revokes the token in **both** services → 204 (503 if Redis is down, so the client retries) |
 | GET | `/admin/api/products` | `search`, `category_id`, `status` (`active`/`inactive`/`trashed`), `page`, `limit` (≤ 100) |
 | GET | `/admin/api/products/{id}` | |
 | POST | `/admin/api/products` | `name`, `sku`, `price`, optional `slug`, `description`, `category_id`, `is_active`, `initial_stock` → 201 |
@@ -87,7 +88,12 @@ curl -H "Authorization: Bearer $TOKEN" -H "Accept: application/json" "http://loc
 
 Responses use the Nest field names (`isActive`, `imagePath`, `stock`, …) and list pages return `{ data, meta: { page, limit, total, totalPages } }`.
 
-How a token is checked (`App\Services\JwtAuthService`): HS256 signature with `JWT_SECRET` (must equal the api-gateway's), not expired, has `sub` and `jti`, not revoked — the Nest logout key `auth:revoked-token:<jti>` is read from Redis without the `admin:` prefix (fails open if Redis is down, like Nest) — and the user still exists. The **admin role is read from the database**, not from the token, so a demoted admin loses access immediately (403). Rate limit: 120 requests/minute per user.
+How a token is checked (`App\Services\JwtAuthService`): HS256 signature with `JWT_SECRET` (must equal the api-gateway's), not expired, has `sub`, `jti` and `iat`, not revoked, and the user still exists. "Revoked" uses the denylist both services share in Redis (no `admin:` prefix, `App\Repositories\RevokedTokenRepository`), checked in one round trip and failing open if Redis is down, like Nest:
+
+- `auth:revoked-token:<jti>` — one token was logged out (by either service), kept until the token would expire;
+- `auth:user-tokens-valid-after:<userId>` = unix time — every token of that user issued before it is dead. This service writes it when a user is **deleted**, their **role changes** or they get a **new password** (edit, own password change, reset), so they lose their tokens in the api-gateway at once too, not after up to an hour. It is written in the same transaction as the change and fails closed: if Redis is down the change is rolled back rather than leaving a deleted user with a working token. Kept for a day, longer than any token lives (the api-gateway caps `JWT_EXPIRES_IN` at a day).
+
+ The **admin role is read from the database**, not from the token, so a demoted admin loses access immediately (403). Rate limit: 120 requests/minute per user.
 
 ## Dashboard
 
@@ -110,9 +116,10 @@ Revenue means the same as on the dashboard — both use `App\Repositories\SalesR
 `/users` (and `/admin/api/users`) lists customers and admins (search, role filter, deleted users), and creates, edits, deletes and restores them. The rules match the Nest registration exactly, so accounts work in both services:
 
 - emails are trimmed and lower-cased, and unique case-insensitively **including deleted users**, checked under the same advisory lock as Nest (`users.email:<email>`) — a shop sign-up and an admin can't create the same email at the same moment;
-- passwords are 8–72 characters (bcrypt ignores everything after 72 bytes) and stored as `$2y$` bcrypt, cost 12; leaving the password empty on edit keeps it, and a new one signs the user out of "remember me" sessions;
+- passwords are 8–72 characters (bcrypt ignores everything after 72 bytes) and stored as `$2y$` bcrypt, cost 12; leaving the password empty on edit keeps it, and a new one signs the user out of "remember me" sessions and kills their API tokens;
 - an admin can't demote or delete their own account, and the last admin can't be removed — demotions and deletions of admins take a lock (`users.admins`), so two admins removing each other at the same moment can't leave none;
-- deleting is a soft delete: the user can no longer log in (panel, API token or shop), their orders stay, and restoring brings the account back.
+- deleting is a soft delete: the user can no longer log in (panel, API token or shop) and their existing tokens die in both services; their orders stay, and restoring brings the account back;
+- a role change also kills the user's tokens, so nobody keeps a token carrying the old role.
 
 ## Orders
 
@@ -184,7 +191,7 @@ Sessions, cache and queues use the shared Redis. Every Laravel key starts with `
 | Sessions | 0 | `admin:<session id>` |
 | Queue (`default`) | 0 | `admin:queues:default` |
 | Cache (dashboard figures, category dropdown, image upload markers), login and API rate limiters | 1 | `admin:<cache key>` |
-| Nest keys Laravel reads (JWT revocation) | 0 | `auth:revoked-token:<jti>` — `shared` connection, no prefix |
+| Token denylist shared with Nest (read and written) | 0 | `auth:revoked-token:<jti>`, `auth:user-tokens-valid-after:<userId>` — `shared` connection, no prefix |
 
 The cache lives in its own Redis database because `php artisan cache:clear` runs `FLUSHDB` on it: in database 0 it would also wipe the Nest queues and idempotency keys, and log every admin out.
 

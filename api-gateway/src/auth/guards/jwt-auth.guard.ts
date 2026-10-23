@@ -37,7 +37,7 @@ export class JwtAuthGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const claims = await this.verify(this.extractBearerToken(request));
 
-    if (await this.revokedTokenStore.isRevoked(claims.jti)) {
+    if (await this.revokedTokenStore.isRevoked(claims)) {
       throw new UnauthorizedException('Access token has been revoked');
     }
 
@@ -57,7 +57,7 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('Invalid or expired access token');
     }
 
-    if (!claims.jti) {
+    if (!claims.jti || typeof claims.iat !== 'number') {
       throw new UnauthorizedException('Invalid or expired access token');
     }
 

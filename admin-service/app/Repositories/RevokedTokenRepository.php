@@ -5,16 +5,37 @@ namespace App\Repositories;
 use Illuminate\Support\Facades\Redis;
 
 /**
- * The Nest api-gateway writes auth:revoked-token:<jti> on logout (TTL = rest of
- * the token's life). Reading the same key makes a logout count in both services.
+ * The access-token denylist shared with the Nest api-gateway (keys without a
+ * prefix, so both services read and write the same ones):
+ *  - auth:revoked-token:<jti> kills one token (a logout), until it expires anyway;
+ *  - auth:user-tokens-valid-after:<userId> = unix time kills every token of that
+ *    user issued before it (deleted, role changed, password changed).
+ *
+ * @throws \RedisException from every method when Redis is unreachable
  */
 class RevokedTokenRepository
 {
-    private const KEY_PREFIX = 'auth:revoked-token:';
+    private const TOKEN_KEY_PREFIX = 'auth:revoked-token:';
 
-    /** @throws \RedisException when Redis is unreachable */
-    public function isRevoked(string $jti): bool
+    private const USER_KEY_PREFIX = 'auth:user-tokens-valid-after:';
+
+    /** Longer than any token lives: the api-gateway caps JWT_EXPIRES_IN at a day. */
+    private const USER_CUTOFF_TTL_SECONDS = 86_400;
+
+    public function isRevoked(string $jti, int $userId, int $issuedAt): bool
     {
-        return (bool) Redis::connection('shared')->exists(self::KEY_PREFIX.$jti);
+        [$revoked, $validAfter] = Redis::connection('shared')->mget([self::TOKEN_KEY_PREFIX.$jti, self::USER_KEY_PREFIX.$userId]);
+
+        return $revoked !== null || ($validAfter !== null && $issuedAt < (int) $validAfter);
+    }
+
+    public function revoke(string $jti, int $expiresAt): void
+    {
+        Redis::connection('shared')->set(self::TOKEN_KEY_PREFIX.$jti, '1', 'EX', max($expiresAt - time(), 1));
+    }
+
+    public function revokeAllForUser(int $userId): void
+    {
+        Redis::connection('shared')->set(self::USER_KEY_PREFIX.$userId, (string) time(), 'EX', self::USER_CUTOFF_TTL_SECONDS);
     }
 }
