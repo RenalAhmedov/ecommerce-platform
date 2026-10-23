@@ -39,6 +39,19 @@ services:
       - "127.0.0.1:${MAIL_SMTP_PORT:-1025}:1025"
       - "127.0.0.1:${MAIL_UI_PORT:-8025}:8025"
 
+  admin-service:
+    build: ./admin-service
+    restart: unless-stopped
+    volumes:
+      - ./admin-service:/var/www/html
+    ports:
+      - "127.0.0.1:${ADMIN_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
 volumes:
   postgres-data:
   redis-data:
