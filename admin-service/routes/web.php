@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductExportController;
 use App\Http\Controllers\ProductImageController;
@@ -26,6 +27,10 @@ Route::middleware(['auth', 'admin'])->group(function () {
         ->name('products.restore');
     Route::post('products/{product}/image', [ProductImageController::class, 'store'])->name('products.image.store');
     Route::delete('products/{product}/image', [ProductImageController::class, 'destroy'])->name('products.image.destroy');
+
+    Route::get('orders', [OrderController::class, 'index'])->name('orders.index');
+    Route::get('orders/{order}', [OrderController::class, 'show'])->name('orders.show');
+    Route::patch('orders/{order}/status', [OrderController::class, 'updateStatus'])->name('orders.status');
 
     Route::resource('categories', CategoryController::class)->except('show');
     Route::patch('categories/{category}/restore', [CategoryController::class, 'restore'])

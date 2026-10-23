@@ -87,6 +87,19 @@ Responses use the Nest field names (`isActive`, `imagePath`, `stock`, …) and l
 
 How a token is checked (`App\Services\JwtAuthService`): HS256 signature with `JWT_SECRET` (must equal the api-gateway's), not expired, has `sub` and `jti`, not revoked — the Nest logout key `auth:revoked-token:<jti>` is read from Redis without the `admin:` prefix (fails open if Redis is down, like Nest) — and the user still exists. The **admin role is read from the database**, not from the token, so a demoted admin loses access immediately (403). Rate limit: 120 requests/minute per user.
 
+## Orders
+
+Orders are placed and paid through the Nest api-gateway; the panel lists them (search by order number or customer, filter by status and date range) and moves them through fulfilment:
+
+```
+paid ──→ processing ──→ shipped ──→ delivered
+  └──→ cancelled ←──┘          (cancelling puts the items back in stock)
+```
+
+- **pending** orders can't be changed here: Nest is charging them, and cancelling one mid-payment would leave a charged customer with a cancelled order. Nest's expiry job resolves stuck ones after 15 minutes. `payment_failed`, `cancelled` and `delivered` are final.
+- A status change locks the order row and then the stock rows in product-id order — the same order as Nest — and re-checks the status under the lock, so two admins (or a double click) can never cancel an order twice and return its stock twice. Each returned item is recorded as a `cancellation` stock movement with the admin's id, shown on the order page.
+- The same is available as JSON: `GET /admin/api/orders`, `GET /admin/api/orders/{id}`, `PATCH /admin/api/orders/{id}/status` (`{"status": "shipped"}`); responses use the Nest `OrderResponseDto` fields plus `customer` and `allowedStatuses`.
+
 ## Import and export
 
 **Export** (`Products › Export CSV`) downloads the products the list currently shows (same search/category/status filters). It is streamed row by row, so its size doesn't matter. Cells starting with `= + - @` get a leading `'` so spreadsheet apps don't run them as formulas (CSV injection).

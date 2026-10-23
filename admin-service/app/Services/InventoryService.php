@@ -24,4 +24,32 @@ class InventoryService
             ]);
         }
     }
+
+    /**
+     * Puts an order's stock back (same as the Nest InventoryService.release):
+     * one "cancellation" movement per product. Must run inside the caller's
+     * transaction, after the order row has been locked.
+     *
+     * @param  array<int, int>  $quantities  product id => quantity
+     */
+    public function release(array $quantities, int $orderId, ?User $user): void
+    {
+        if ($quantities === []) {
+            return;
+        }
+
+        ksort($quantities);
+        $this->inventory->lockByProductIds(array_keys($quantities));
+
+        foreach ($quantities as $productId => $quantity) {
+            $this->inventory->adjustQuantity($productId, $quantity);
+            $this->inventory->recordMovement([
+                'product_id' => $productId,
+                'order_id' => $orderId,
+                'user_id' => $user?->id,
+                'change' => $quantity,
+                'reason' => InventoryMovementReason::Cancellation,
+            ]);
+        }
+    }
 }
