@@ -39,11 +39,12 @@ class CatalogWebhookTest extends FeatureTestCase
             && $request['type'] === 'catalog.changed');
     }
 
-    public function test_creating_a_product_in_the_panel_notifies_the_gateway(): void
+    public function test_creating_a_product_in_the_panel_notifies_the_gateway_with_the_same_request_id(): void
     {
-        $this->actingAs($this->admin)->post('/products', ['name' => 'Desk Lamp', 'sku' => 'LAMP-1', 'price' => '49.90'])->assertSessionHasNoErrors();
+        $response = $this->actingAs($this->admin)->post('/products', ['name' => 'Desk Lamp', 'sku' => 'LAMP-1', 'price' => '49.90'])->assertSessionHasNoErrors();
 
         $this->assertWebhookSent();
+        Http::assertSent(fn (Request $request) => $request->header('X-Request-Id') === [$response->headers->get('X-Request-Id')]);
     }
 
     public function test_category_changes_and_cancelled_orders_notify_the_gateway(): void
