@@ -88,6 +88,16 @@ class JwtAuthServiceTest extends UnitTestCase
         $this->assertNull($this->service()->userFromToken($this->token()));
     }
 
+    public function test_a_token_stays_active_until_it_expires_or_is_revoked(): void
+    {
+        $this->revokedTokens->shouldReceive('isRevoked')->with('jti-1', 7, $this->issuedAt)->andReturn(false, true);
+        $claims = (object) ['jti' => 'jti-1', 'sub' => 7, 'iat' => $this->issuedAt, 'exp' => time() + 60];
+
+        $this->assertTrue($this->service()->isActive($claims));
+        $this->assertFalse($this->service()->isActive($claims));
+        $this->assertFalse($this->service()->isActive((object) [...(array) $claims, 'exp' => time() - 1]));
+    }
+
     public function test_logout_revokes_the_token_until_it_expires(): void
     {
         $this->revokedTokens->shouldReceive('revoke')->once()->with('jti-1', $this->issuedAt + 3600);

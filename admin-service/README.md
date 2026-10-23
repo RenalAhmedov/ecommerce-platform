@@ -42,6 +42,17 @@ docker compose exec postgres psql -U ecommerce -d ecommerce -c "UPDATE users SET
 
 Password reset emails go to Mailpit at http://localhost:8025 and are only sent to admin accounts.
 
+### Shared session with the api-gateway
+
+An admin already signed in to the Nest API doesn't need a second login: on the login page, open **"Signed in to the shop API? Use your access token"** and paste the `accessToken` from `POST /api/auth/login` (the form posts to `POST /login/token`, throttled like the password login). The token is sent in the form body, never in the URL, so it can't leak into logs or browser history. It must be valid, not revoked, and belong to an admin; bad, revoked and customer tokens all get the same error.
+
+The panel session is then tied to that token (the session keeps only its `jti`/`sub`/`iat`/`exp`, never the token itself):
+
+- logging out of the API (`POST /api/auth/logout`), or the token being revoked or expiring, ends the panel session on its next request (`EnsureSessionTokenIsActive` middleware, one Redis read per request);
+- logging out of the panel revokes the token, so the API refuses it too. If Redis is down, the panel logout still works and the token dies when it expires.
+
+Sessions opened with a password are not tied to any token. Tokens are only ever issued by the api-gateway, which stays the single place users log in with credentials for the API.
+
 ## Database and migrations
 
 Both services share one PostgreSQL database, so table ownership is explicit:

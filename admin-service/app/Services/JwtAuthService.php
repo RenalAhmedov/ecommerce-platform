@@ -34,6 +34,14 @@ class JwtAuthService
 
     public function userFromToken(?string $token): ?User
     {
+        $claims = $this->verify($token);
+
+        return $claims === null ? null : $this->users->findById((int) $claims->sub);
+    }
+
+    /** The claims of a valid token that neither service has revoked, or null. */
+    public function verify(?string $token): ?object
+    {
         $claims = $this->claims($token);
 
         if ($claims === null) {
@@ -47,7 +55,13 @@ class JwtAuthService
             return null;
         }
 
-        return $this->users->findById((int) $claims->sub);
+        return $claims;
+    }
+
+    /** Re-checks claims verified earlier (a panel session opened with the token): not expired and not revoked since. */
+    public function isActive(object $claims): bool
+    {
+        return $claims->exp > time() && ! $this->isRevoked($claims);
     }
 
     /** Same contract as the api-gateway's logout: the token is refused by both services until it expires. */
@@ -56,12 +70,18 @@ class JwtAuthService
         $claims = $this->claims($token) ?? throw new LogicException('logout() needs a token the jwt guard has accepted.');
 
         try {
-            $this->revokedTokens->revoke($claims->jti, $claims->exp);
+            $this->revoke($claims);
         } catch (RedisException $e) {
             Log::error('Logout failed: Redis unavailable.', ['jti' => $claims->jti, 'error' => $e->getMessage()]);
 
             throw new ServiceUnavailableHttpException(message: 'Could not log out right now, please retry', previous: $e);
         }
+    }
+
+    /** @throws RedisException */
+    public function revoke(object $claims): void
+    {
+        $this->revokedTokens->revoke($claims->jti, $claims->exp);
 
         Log::info('Access token revoked by logout', ['jti' => $claims->jti, 'sub' => $claims->sub]);
     }

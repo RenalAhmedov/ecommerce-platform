@@ -29,6 +29,11 @@ class UserService
         return $this->users->paginate($filters, $perPage);
     }
 
+    public function find(int $id): ?User
+    {
+        return $this->users->findById($id);
+    }
+
     /**
      * Same uniqueness rule as the Nest registration (same advisory lock,
      * case-insensitive, deleted users included), so a shop sign-up and an

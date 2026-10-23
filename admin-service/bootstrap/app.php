@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureSessionTokenIsActive;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\LogRequests;
 use Illuminate\Foundation\Application;
@@ -17,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(LogRequests::class);
+        $middleware->web(append: EnsureSessionTokenIsActive::class);
         $middleware->alias([
             'admin' => EnsureUserIsAdmin::class,
         ]);

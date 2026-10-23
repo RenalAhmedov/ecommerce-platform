@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Http\Requests\Auth\TokenLoginRequest;
 use App\Services\AuthService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -26,6 +27,16 @@ class AuthenticatedSessionController extends Controller
             $request->boolean('remember'),
             $request->ip(),
         );
+
+        $request->session()->regenerate();
+
+        return redirect()->intended(route('dashboard', absolute: false));
+    }
+
+    /** Opens a panel session with an access token from the api-gateway, so an admin logs in once for both. */
+    public function storeWithToken(TokenLoginRequest $request): RedirectResponse
+    {
+        $this->auth->loginWithToken($request->string('token')->toString(), $request->ip());
 
         $request->session()->regenerate();
 
