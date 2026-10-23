@@ -29,6 +29,15 @@ final class AdvisoryLock
     }
 
     /**
+     * Taken by every change that can remove an admin (demotion, deletion), so
+     * two admins demoting each other at the same moment can't leave none.
+     */
+    public static function adminRoster(): string
+    {
+        return 'users.admins';
+    }
+
+    /**
      * Only the admin service writes categories, and those writes are rare, so
      * one lock serialises them all: slug checks and moves within the tree
      * (two concurrent moves could otherwise create a loop).

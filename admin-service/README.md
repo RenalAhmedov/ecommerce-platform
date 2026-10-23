@@ -87,6 +87,21 @@ Responses use the Nest field names (`isActive`, `imagePath`, `stock`, …) and l
 
 How a token is checked (`App\Services\JwtAuthService`): HS256 signature with `JWT_SECRET` (must equal the api-gateway's), not expired, has `sub` and `jti`, not revoked — the Nest logout key `auth:revoked-token:<jti>` is read from Redis without the `admin:` prefix (fails open if Redis is down, like Nest) — and the user still exists. The **admin role is read from the database**, not from the token, so a demoted admin loses access immediately (403). Rate limit: 120 requests/minute per user.
 
+## Dashboard
+
+`/dashboard` (and `GET /admin/api/dashboard`) shows revenue, order count and average order value for today / this week / this month, a 14-day revenue chart, orders waiting to be processed or shipped, orders by status, customers (+ new this month), low-stock products, the top sellers of the last 30 days and the latest orders. Revenue counts orders that were paid and not cancelled (`paid`, `processing`, `shipped`, `delivered`), by payment time, in UTC.
+
+The figures are cached in Redis (`admin:dashboard:metrics`, cache DB 1) with stale-while-revalidate (`Cache::flexible`): fresh for 30 s, then the previous figures are served instantly for up to 5 minutes while one background refresh recomputes them. Because the Nest service also writes orders, a short lifetime is used instead of clearing the cache on every change; the page shows when its figures were computed.
+
+## Users
+
+`/users` (and `/admin/api/users`) lists customers and admins (search, role filter, deleted users), and creates, edits, deletes and restores them. The rules match the Nest registration exactly, so accounts work in both services:
+
+- emails are trimmed and lower-cased, and unique case-insensitively **including deleted users**, checked under the same advisory lock as Nest (`users.email:<email>`) — a shop sign-up and an admin can't create the same email at the same moment;
+- passwords are 8–72 characters (bcrypt ignores everything after 72 bytes) and stored as `$2y$` bcrypt, cost 12; leaving the password empty on edit keeps it, and a new one signs the user out of "remember me" sessions;
+- an admin can't demote or delete their own account, and the last admin can't be removed — demotions and deletions of admins take a lock (`users.admins`), so two admins removing each other at the same moment can't leave none;
+- deleting is a soft delete: the user can no longer log in (panel, API token or shop), their orders stay, and restoring brings the account back.
+
 ## Orders
 
 Orders are placed and paid through the Nest api-gateway; the panel lists them (search by order number or customer, filter by status and date range) and moves them through fulfilment:
@@ -140,7 +155,7 @@ Sessions, cache and queues use the shared Redis. Every Laravel key starts with `
 |---|---|---|
 | Sessions | 0 | `admin:<session id>` |
 | Queue (`default`) | 0 | `admin:queues:default` |
-| Cache, login and API rate limiters | 1 | `admin:<cache key>` |
+| Cache (dashboard figures, image upload markers), login and API rate limiters | 1 | `admin:<cache key>` |
 | Nest keys Laravel reads (JWT revocation) | 0 | `auth:revoked-token:<jti>` — `shared` connection, no prefix |
 
 The cache lives in its own Redis database because `php artisan cache:clear` runs `FLUSHDB` on it: in database 0 it would also wipe the Nest queues and idempotency keys, and log every admin out.

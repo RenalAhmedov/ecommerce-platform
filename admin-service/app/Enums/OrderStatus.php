@@ -30,6 +30,17 @@ enum OrderStatus: string
         };
     }
 
+    /**
+     * Orders whose money the shop keeps: paid and not cancelled. Used by the
+     * dashboard and the sales reports.
+     *
+     * @return list<self>
+     */
+    public static function revenueStatuses(): array
+    {
+        return [self::Paid, self::Processing, self::Shipped, self::Delivered];
+    }
+
     public function canMoveTo(self $status): bool
     {
         return in_array($status, $this->adminTransitions(), true);

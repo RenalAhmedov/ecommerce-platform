@@ -1,17 +1,19 @@
 <?php
 
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductExportController;
 use App\Http\Controllers\ProductImageController;
 use App\Http\Controllers\ProductImportController;
+use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/dashboard');
 
 Route::middleware(['auth', 'admin'])->group(function () {
-    Route::view('/dashboard', 'dashboard')->name('dashboard');
+    Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::view('/profile', 'profile.edit')->name('profile.edit');
 
     // Fixed paths are registered before products/{product} so "export" is never read as an id.
@@ -36,6 +38,11 @@ Route::middleware(['auth', 'admin'])->group(function () {
     Route::patch('categories/{category}/restore', [CategoryController::class, 'restore'])
         ->withTrashed()
         ->name('categories.restore');
+
+    Route::resource('users', UserController::class)->except('show');
+    Route::patch('users/{user}/restore', [UserController::class, 'restore'])
+        ->withTrashed()
+        ->name('users.restore');
 });
 
 require __DIR__.'/auth.php';

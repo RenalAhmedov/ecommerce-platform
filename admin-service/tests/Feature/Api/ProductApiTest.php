@@ -231,6 +231,29 @@ class ProductApiTest extends TestCase
             ->assertJsonPath('data.items.0', fn (array $item) => $item['productName'] === 'Mug' && $item['quantity'] === 2 && $item['unitPrice'] === '4.50' && $item['lineTotal'] === '9.00');
     }
 
+    public function test_the_dashboard_figures_are_available_as_json(): void
+    {
+        $this->api()->getJson('/admin/api/dashboard')
+            ->assertOk()
+            ->assertJsonStructure(['data' => ['generatedAt', 'revenue' => ['today', 'week', 'month'], 'dailyRevenue', 'ordersByStatus', 'customers', 'lowStock', 'topSellers', 'recentOrders']]);
+    }
+
+    public function test_users_through_the_api(): void
+    {
+        $this->api()->postJson('/admin/api/users', ['name' => 'Api User', 'email' => 'API@example.test', 'password' => 'secret-password', 'role' => 'customer'])
+            ->assertCreated()
+            ->assertJsonPath('data.email', 'api@example.test')
+            ->assertJsonMissingPath('data.password');
+
+        $user = User::where('email', 'api@example.test')->sole();
+
+        $this->api()->getJson('/admin/api/users?role=customer')->assertOk()->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.ordersCount', 0);
+        $this->api()->patchJson("/admin/api/users/{$user->id}", ['role' => 'admin'])->assertOk()->assertJsonPath('data.role', 'admin');
+        $this->api()->deleteJson("/admin/api/users/{$this->admin->id}")->assertUnprocessable()->assertJsonValidationErrors('user');
+        $this->api()->deleteJson("/admin/api/users/{$user->id}")->assertNoContent();
+        $this->api()->patchJson("/admin/api/users/{$user->id}/restore")->assertOk()->assertJsonPath('data.deletedAt', null);
+    }
+
     public function test_order_status_changes_through_the_api(): void
     {
         $order = Order::factory()->create(['status' => OrderStatus::Paid]);
