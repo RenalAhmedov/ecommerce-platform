@@ -10,6 +10,7 @@ import {
   Min,
 } from 'class-validator';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js';
+import { absentIfNull } from '../../common/transformers/optional.transformers.js';
 import { SortOrder } from '../../common/enums/sort-order.enum.js';
 import {
   toUpperCase,
@@ -28,6 +29,7 @@ export class ProductQueryDto extends PaginationQueryDto {
 
   @Field(() => Int, { nullable: true })
   @IsOptional()
+  @Transform(absentIfNull)
   @Type(() => Number)
   @IsInt()
   @Min(1)
@@ -35,6 +37,7 @@ export class ProductQueryDto extends PaginationQueryDto {
 
   @Field(() => Float, { nullable: true })
   @IsOptional()
+  @Transform(absentIfNull)
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
@@ -42,6 +45,7 @@ export class ProductQueryDto extends PaginationQueryDto {
 
   @Field(() => Float, { nullable: true })
   @IsOptional()
+  @Transform(absentIfNull)
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)

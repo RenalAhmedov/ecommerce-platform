@@ -8,6 +8,7 @@ use App\Http\Controllers\ProductExportController;
 use App\Http\Controllers\ProductImageController;
 use App\Http\Controllers\ProductImportController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\ShopSearchController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -15,6 +16,7 @@ Route::redirect('/', '/dashboard');
 
 Route::middleware(['auth', 'admin'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+    Route::get('/shop-search', ShopSearchController::class)->name('shop-search');
     Route::view('/profile', 'profile.edit')->name('profile.edit');
 
     // Fixed paths are registered before products/{product} so "export" is never read as an id.

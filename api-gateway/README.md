@@ -77,6 +77,8 @@ curl -s localhost:8080/api/graphql -H 'Content-Type: application/json' -H "Autho
 
 - **Errors** keep the REST status in GraphQL's shape: `extensions.code` (`BAD_REQUEST`, `UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `TOO_MANY_REQUESTS`, …), `extensions.status` and every validation message in `extensions.details`.
 - **Enums** use their GraphQL names: `sortBy: Price`, `sortOrder: Desc`, `status: Shipped`.
+- An unused filter may be left out or sent as `null` (as GraphQL clients do with unset variables): both mean "no filter".
+- **Used by** the admin panel's *Shop search* page, which asks this API what customers find (only this service has the Elasticsearch search).
 - Money is a decimal string (`"12.50"`) like in REST; ids are `Int`; dates are ISO strings.
 - The guards (JWT, roles, rate limiting) and the error filter handle GraphQL operations the same way as REST calls, so a query can't be used to get around them.
 - Introspection is off in production, and there is no built-in browser IDE (it would need the strict Content-Security-Policy relaxed): use Postman, Insomnia or any GraphQL client against the endpoint.

@@ -212,6 +212,21 @@ Uploading an image (edit page, or `POST /admin/api/products/{id}/image` as multi
 
 Only the newest upload of a product is ever applied (two quick uploads can't end with the older picture), removing an image also cancels an upload still in the queue, and a file that can't be decoded fails the job at once instead of retrying. Uploads are limited to JPEG/PNG/WebP, 5 MB and 8000 px per side.
 
+## Shop search preview (GraphQL)
+
+**Shop search** (`/shop-search`) shows admins what customers get when they search the shop: typos forgiven, best matches first, with price, stock and a link to edit each product. The search (Elasticsearch) lives in the api-gateway, so this page asks its **GraphQL API** (`App\Integrations\NestShopClient` → `POST http://api-gateway:3000/api/graphql`) for exactly the fields it shows:
+
+```graphql
+query ShopSearch($search: String!, $sortBy: ProductSortField!, $sortOrder: SortOrder!, $categoryId: Int, $minPrice: Float, $maxPrice: Float) {
+  products(search: $search, sortBy: $sortBy, sortOrder: $sortOrder, categoryId: $categoryId, minPrice: $minPrice, maxPrice: $maxPrice, limit: 20) {
+    data { id name sku price stock imagePath category { name } }
+    meta { total }
+  }
+}
+```
+
+`ShopSearchService` builds the variables from the form (`ShopSearchRequest`) and also reads `/api/health`: when Elasticsearch is down the page says the shop is on its plain search; when the api-gateway can't be reached it says so instead of failing. The request id travels with the call, so the panel's log line and the api-gateway's share it.
+
 ## Live updates (Reverb + Echo)
 
 The panel receives events over WebSockets: [Laravel Reverb](https://reverb.laravel.com) runs as the `reverb` container, and Echo in the browser connects to it through Nginx (`/app`, the same address as the page, so no extra port). Reverb's publishing API (`/apps`) is not exposed; this app reaches it directly on the Docker network (`REVERB_HOST=reverb`).

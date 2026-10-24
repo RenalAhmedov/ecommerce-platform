@@ -62,6 +62,26 @@ describe('GraphQL (integration)', () => {
     expect(cached.body).toEqual(fresh.body);
   });
 
+  it('treats filters sent as explicit nulls (as GraphQL clients do) like left-out ones', async () => {
+    const { body } = await testApp.request<
+      GraphqlBody<{
+        products: { meta: { total: number } };
+        myOrders: { meta: { total: number } };
+      }>
+    >('POST', '/graphql', {
+      body: {
+        query: `query ($category: Int, $min: Float, $max: Float, $status: OrderStatus) {
+          products(categoryId: $category, minPrice: $min, maxPrice: $max) { meta { total } }
+          myOrders(status: $status) { meta { total } } }`,
+        variables: { category: null, min: null, max: null, status: null },
+      },
+      token: customer.token,
+    });
+
+    expect(body.errors).toBeUndefined();
+    expect(body.data?.products.meta.total).toBe(1);
+  });
+
   it('answers with the same rules and errors as REST', async () => {
     const notFound = await graphql('{ product(id: 999999) { name } }');
     const invalid = await graphql(

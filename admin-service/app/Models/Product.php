@@ -42,12 +42,15 @@ class Product extends Model
             : null);
     }
 
+    public static function thumbnailUrlFor(string $imagePath): string
+    {
+        return Storage::disk(self::IMAGE_DISK)->url(self::thumbnailPathFor($imagePath));
+    }
+
     /** @return Attribute<?string, never> */
     protected function thumbnailUrl(): Attribute
     {
-        return Attribute::get(fn () => $this->image_path
-            ? Storage::disk(self::IMAGE_DISK)->url(self::thumbnailPathFor($this->image_path))
-            : null);
+        return Attribute::get(fn () => $this->image_path ? self::thumbnailUrlFor($this->image_path) : null);
     }
 
     /** @return BelongsTo<Category, $this> */
