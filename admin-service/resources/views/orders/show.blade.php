@@ -2,7 +2,7 @@
     <x-slot name="header">
         <div class="flex items-center gap-3">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight font-mono">{{ $order->order_number }}</h2>
-            <x-order-status :status="$order->status" />
+            <x-order-status :status="$order->status" :order="$order->id" />
         </div>
     </x-slot>
 

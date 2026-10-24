@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Enums\OrderStatus;
+use App\Events\OrderPaid;
+use App\Events\OrderStatusChanged;
 use App\Models\Order;
 use App\Models\User;
 use App\Repositories\OrderRepository;
@@ -16,6 +18,7 @@ class OrderService
     public function __construct(
         private readonly OrderRepository $orders,
         private readonly InventoryService $inventory,
+        private readonly CatalogNotifier $catalog,
     ) {}
 
     /**
@@ -42,7 +45,7 @@ class OrderService
      */
     public function changeStatus(Order $order, OrderStatus $status, User $admin): Order
     {
-        return DB::transaction(function () use ($order, $status, $admin) {
+        $order = DB::transaction(function () use ($order, $status, $admin) {
             $order = $this->orders->lockById($order->id);
 
             if (! $order->status->canMoveTo($status)) {
@@ -69,5 +72,30 @@ class OrderService
 
             return $order;
         });
+
+        // Returned stock changes the products' "stock" in the shop's cached responses.
+        if ($status === OrderStatus::Cancelled) {
+            $this->catalog->catalogChanged('order cancelled, stock returned');
+        }
+
+        OrderStatusChanged::dispatch($order, $admin);
+
+        return $order;
+    }
+
+    /** The api-gateway took a payment: tells every admin with the panel open. */
+    public function announcePaid(int $orderId): void
+    {
+        $order = $this->orders->findWithCustomer($orderId);
+
+        if ($order === null) {
+            Log::warning('Paid order announced by the api-gateway does not exist', ['order_id' => $orderId]);
+
+            return;
+        }
+
+        OrderPaid::dispatch($order);
+
+        Log::info('Admins notified of a paid shop order', ['order_id' => $order->id, 'order_number' => $order->order_number]);
     }
 }

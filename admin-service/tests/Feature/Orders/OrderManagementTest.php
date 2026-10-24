@@ -74,7 +74,8 @@ class OrderManagementTest extends FeatureTestCase
     {
         $ada = User::factory()->create(['name' => 'Ada']);
         $order = Order::factory()->for($ada)->create();
-        $unrelated = Order::factory()->create();
+        // A fixed customer: a random one could be called "Adams" or live at "...@nevada.test".
+        $unrelated = Order::factory()->for(User::factory()->state(['name' => 'Grace', 'email' => 'grace@example.test']))->create();
 
         $this->actingAs($this->admin)->get('/orders?search=Ada')->assertSee($order->order_number)->assertDontSee($unrelated->order_number);
     }

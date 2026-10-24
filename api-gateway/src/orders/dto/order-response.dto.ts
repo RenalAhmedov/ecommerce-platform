@@ -1,11 +1,18 @@
+import { Field, ObjectType } from '@nestjs/graphql';
 import type { Order } from '../entities/order.entity.js';
-import type { ShippingAddressDto } from './shipping-address.dto.js';
 import { OrderItemResponseDto } from './order-item-response.dto.js';
 import { OrderSummaryResponseDto } from './order-summary-response.dto.js';
+import { ShippingAddressResponseDto } from './shipping-address-response.dto.js';
 
+@ObjectType('Order')
 export class OrderResponseDto extends OrderSummaryResponseDto {
+  @Field(() => String, { nullable: true })
   paymentReference: string | null;
-  shippingAddress: ShippingAddressDto | null;
+
+  @Field(() => ShippingAddressResponseDto, { nullable: true })
+  shippingAddress: ShippingAddressResponseDto | null;
+
+  @Field(() => [OrderItemResponseDto])
   items: OrderItemResponseDto[];
 
   static override fromEntity(order: Order): OrderResponseDto {

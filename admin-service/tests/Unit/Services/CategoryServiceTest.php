@@ -4,6 +4,7 @@ namespace Tests\Unit\Services;
 
 use App\Models\Category;
 use App\Repositories\CategoryRepository;
+use App\Services\CatalogNotifier;
 use App\Services\CategoryService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Str;
@@ -13,6 +14,8 @@ use Tests\Unit\UnitTestCase;
 
 class CategoryServiceTest extends UnitTestCase
 {
+    private CatalogNotifier&MockInterface $catalog;
+
     private CategoryRepository&MockInterface $categories;
 
     private CategoryService $service;
@@ -22,6 +25,8 @@ class CategoryServiceTest extends UnitTestCase
         parent::setUp();
 
         $this->categories = $this->mock(CategoryRepository::class);
+        $this->catalog = $this->mock(CatalogNotifier::class);
+        $this->catalog->shouldReceive('catalogChanged')->byDefault();
         $this->service = app(CategoryService::class);
     }
 
@@ -84,6 +89,7 @@ class CategoryServiceTest extends UnitTestCase
         $this->categories->shouldReceive('lockTree')->once()->ordered();
         $this->categories->shouldReceive('existsBySlug')->once()->with('mugs', null)->andReturnFalse()->ordered();
         $this->categories->shouldReceive('create')->once()->with(['name' => 'Mugs', 'slug' => 'mugs'])->andReturn($created)->ordered();
+        $this->catalog->shouldReceive('catalogChanged')->once()->with('category changed');
 
         $this->assertSame($created, $this->service->create(['name' => 'Mugs', 'slug' => 'mugs']));
     }
@@ -199,5 +205,15 @@ class CategoryServiceTest extends UnitTestCase
         $this->service->create(['name' => 'Toys', 'slug' => 'toys']);
 
         $this->assertSame([1 => 'Books', 2 => 'Toys'], $this->service->options());
+    }
+
+    public function test_an_update_that_changes_nothing_announces_nothing(): void
+    {
+        $books = $this->category(4, 'Books');
+        $this->categories->shouldReceive('lockTree');
+        $this->categories->shouldReceive('save')->once();
+        $this->catalog->shouldNotReceive('catalogChanged');
+
+        $this->service->update($books, ['name' => 'Books']);
     }
 }

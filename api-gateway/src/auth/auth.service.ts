@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -7,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import bcrypt from 'bcryptjs';
 import { randomUUID } from 'node:crypto';
+import { describeError } from '../common/utils/describe-error.js';
 import type { EnvironmentVariables } from '../config/interfaces/environment-variables.interface.js';
 import { UserResponseDto } from '../users/dto/user-response.dto.js';
 import type { User } from '../users/entities/user.entity.js';
@@ -24,6 +26,8 @@ import { hashPassword } from './utils/password.js';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
@@ -37,6 +41,7 @@ export class AuthService {
       email: dto.email,
       password: await hashPassword(dto.password),
     });
+    this.logger.log(`Customer registered: user ${user.id}`);
 
     return this.buildAuthResponse(user);
   }
@@ -49,21 +54,29 @@ export class AuthService {
     );
 
     if (!user || !passwordMatches) {
+      this.logger.warn(`Login failed for ${dto.email}`);
       throw new UnauthorizedException('Invalid credentials');
     }
+
+    this.logger.log(`User ${user.id} logged in`);
 
     return this.buildAuthResponse(user);
   }
 
-  async logout({ jti, exp }: AccessTokenClaims): Promise<void> {
+  async logout({ sub, jti, exp }: AccessTokenClaims): Promise<void> {
     try {
       await this.revokedTokenStore.revoke(jti, exp);
     } catch (error) {
+      this.logger.error(
+        `Logout of user ${sub} failed, Redis unavailable (${describeError(error)})`,
+      );
       throw new ServiceUnavailableException(
         'Could not log out right now, please retry',
         { cause: error },
       );
     }
+
+    this.logger.log(`User ${sub} logged out (token ${jti} revoked)`);
   }
 
   async getProfile(userId: number): Promise<UserResponseDto> {

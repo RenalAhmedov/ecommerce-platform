@@ -16,6 +16,7 @@ class ProductService
     public function __construct(
         private readonly ProductRepository $products,
         private readonly InventoryService $inventory,
+        private readonly CatalogNotifier $catalog,
     ) {}
 
     /**
@@ -41,7 +42,7 @@ class ProductService
     /** @param  array<string, mixed>  $data */
     public function create(array $data, ?User $admin): Product
     {
-        return DB::transaction(function () use ($data, $admin) {
+        $product = DB::transaction(function () use ($data, $admin) {
             $this->products->lockUniqueValues($data['sku'], $data['slug']);
             $this->ensureAvailable($data['sku'], $data['slug']);
 
@@ -52,12 +53,15 @@ class ProductService
 
             return $product;
         });
+        $this->catalog->catalogChanged('product created');
+
+        return $product;
     }
 
     /** @param  array<string, mixed>  $data */
     public function update(Product $product, array $data): Product
     {
-        return DB::transaction(function () use ($product, $data) {
+        [$product, $changed] = DB::transaction(function () use ($product, $data) {
             $product = $this->products->lockById($product->id);
             $product->fill($data);
 
@@ -74,8 +78,14 @@ class ProductService
                 Log::info('Product updated', ['product_id' => $product->id, 'sku' => $product->sku, 'changed' => $changed]);
             }
 
-            return $product;
+            return [$product, $changed];
         });
+
+        if ($changed !== []) {
+            $this->catalog->catalogChanged('product updated');
+        }
+
+        return $product;
     }
 
     public function delete(Product $product): void
@@ -83,6 +93,7 @@ class ProductService
         $this->products->delete($product);
 
         Log::info('Product moved to trash', ['product_id' => $product->id, 'sku' => $product->sku]);
+        $this->catalog->catalogChanged('product deleted');
     }
 
     public function restore(Product $product): void
@@ -90,6 +101,7 @@ class ProductService
         $this->products->restore($product);
 
         Log::info('Product restored', ['product_id' => $product->id, 'sku' => $product->sku]);
+        $this->catalog->catalogChanged('product restored');
     }
 
     /** @throws ValidationException */

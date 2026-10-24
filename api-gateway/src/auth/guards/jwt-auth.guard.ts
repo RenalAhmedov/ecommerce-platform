@@ -2,11 +2,13 @@ import {
   CanActivate,
   ExecutionContext,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
+import { httpContextOf } from '../../common/utils/http-context.js';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator.js';
 import type { AuthenticatedRequest } from '../interfaces/authenticated-request.interface.js';
 import type { AccessTokenClaims } from '../interfaces/jwt-payload.interface.js';
@@ -14,6 +16,8 @@ import { RevokedTokenStore } from '../revoked-token.store.js';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
+  private readonly logger = new Logger(JwtAuthGuard.name);
+
   constructor(
     private readonly jwtService: JwtService,
     private readonly reflector: Reflector,
@@ -21,7 +25,9 @@ export class JwtAuthGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    if (context.getType() !== 'http') {
+    const http = httpContextOf<AuthenticatedRequest>(context);
+
+    if (!http) {
       return true;
     }
 
@@ -34,10 +40,14 @@ export class JwtAuthGuard implements CanActivate {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    const request = http.req;
     const claims = await this.verify(this.extractBearerToken(request));
 
-    if (await this.revokedTokenStore.isRevoked(claims.jti)) {
+    if (await this.revokedTokenStore.isRevoked(claims)) {
+      // A revoked token being reused can mean it was stolen.
+      this.logger.warn(
+        `Revoked access token used: user ${claims.sub}, token ${claims.jti}`,
+      );
       throw new UnauthorizedException('Access token has been revoked');
     }
 
@@ -57,7 +67,7 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('Invalid or expired access token');
     }
 
-    if (!claims.jti) {
+    if (!claims.jti || typeof claims.iat !== 'number') {
       throw new UnauthorizedException('Invalid or expired access token');
     }
 

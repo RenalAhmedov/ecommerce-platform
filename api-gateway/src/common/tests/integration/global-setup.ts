@@ -42,6 +42,7 @@ export default async function setup(
     REDIS_DB: '0',
     RATE_LIMIT_ENABLED: 'false',
     JWT_SECRET: 'integration-tests-only-secret-0123456789abcdef',
+    INTERNAL_API_KEY: 'integration-tests-only-api-key-0123456789abcdef',
   };
 
   await runMigrations(validateEnv(env));

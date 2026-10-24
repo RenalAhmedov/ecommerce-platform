@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Log;
 use LogicException;
 use Mockery\MockInterface;
 use RedisException;
+use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
 use Tests\Unit\UnitTestCase;
 
 class JwtAuthServiceTest extends UnitTestCase
@@ -22,6 +23,8 @@ class JwtAuthServiceTest extends UnitTestCase
 
     private RevokedTokenRepository&MockInterface $revokedTokens;
 
+    private int $issuedAt;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -29,6 +32,7 @@ class JwtAuthServiceTest extends UnitTestCase
         config(['auth.jwt.secret' => self::SECRET]);
         $this->users = $this->mock(UserRepository::class);
         $this->revokedTokens = $this->mock(RevokedTokenRepository::class);
+        $this->issuedAt = time();
     }
 
     private function service(): JwtAuthService
@@ -39,7 +43,7 @@ class JwtAuthServiceTest extends UnitTestCase
     /** Signed exactly like the Nest api-gateway does. */
     private function token(array $overrides = [], string $secret = self::SECRET, string $algorithm = 'HS256'): string
     {
-        $claims = ['sub' => 7, 'email' => 'ada@example.test', 'role' => 'admin', 'jti' => 'jti-1', 'iat' => time(), 'exp' => time() + 3600, ...$overrides];
+        $claims = ['sub' => 7, 'email' => 'ada@example.test', 'role' => 'admin', 'jti' => 'jti-1', 'iat' => $this->issuedAt, 'exp' => $this->issuedAt + 3600, ...$overrides];
 
         return JWT::encode(array_filter($claims, fn ($value) => $value !== null), $secret, $algorithm);
     }
@@ -47,7 +51,7 @@ class JwtAuthServiceTest extends UnitTestCase
     public function test_a_valid_token_resolves_its_user(): void
     {
         $user = User::factory()->make(['id' => 7]);
-        $this->revokedTokens->shouldReceive('isRevoked')->once()->with('jti-1')->andReturnFalse();
+        $this->revokedTokens->shouldReceive('isRevoked')->once()->with('jti-1', 7, $this->issuedAt)->andReturnFalse();
         $this->users->shouldReceive('findById')->once()->with(7)->andReturn($user);
 
         $this->assertSame($user, $this->service()->userFromToken($this->token()));
@@ -63,9 +67,10 @@ class JwtAuthServiceTest extends UnitTestCase
             'empty' => '',
             'garbage' => 'not.a.jwt',
             'wrong secret' => $this->token(secret: str_repeat('x', 64)),
-            'expired' => $this->token(['iat' => time() - 7200, 'exp' => time() - 3600]),
+            'expired' => $this->token(['iat' => $this->issuedAt - 7200, 'exp' => $this->issuedAt - 3600]),
             'other algorithm' => $this->token(algorithm: 'HS512'),
             'no jti' => $this->token(['jti' => null]),
+            'no iat' => $this->token(['iat' => null]),
             'non-numeric sub' => $this->token(['sub' => 'ada']),
         ];
 
@@ -74,12 +79,48 @@ class JwtAuthServiceTest extends UnitTestCase
         }
     }
 
-    public function test_a_token_revoked_by_a_nest_logout_is_refused(): void
+    public function test_a_revoked_token_is_refused(): void
     {
         $this->revokedTokens->shouldReceive('isRevoked')->andReturnTrue();
         $this->users->shouldNotReceive('findById');
+        Log::shouldReceive('warning')->once()->with('Revoked access token used', ['jti' => 'jti-1', 'sub' => 7]);
 
         $this->assertNull($this->service()->userFromToken($this->token()));
+    }
+
+    public function test_a_token_stays_active_until_it_expires_or_is_revoked(): void
+    {
+        $this->revokedTokens->shouldReceive('isRevoked')->with('jti-1', 7, $this->issuedAt)->andReturn(false, true);
+        $claims = (object) ['jti' => 'jti-1', 'sub' => 7, 'iat' => $this->issuedAt, 'exp' => time() + 60];
+
+        $this->assertTrue($this->service()->isActive($claims));
+        $this->assertFalse($this->service()->isActive($claims));
+        $this->assertFalse($this->service()->isActive((object) [...(array) $claims, 'exp' => time() - 1]));
+    }
+
+    public function test_logout_revokes_the_token_until_it_expires(): void
+    {
+        $this->revokedTokens->shouldReceive('revoke')->once()->with('jti-1', $this->issuedAt + 3600);
+
+        $this->service()->logout($this->token());
+    }
+
+    public function test_logout_reports_503_when_redis_is_down_so_the_client_retries(): void
+    {
+        $this->revokedTokens->shouldReceive('revoke')->andThrow(new RedisException('Connection refused'));
+
+        $this->expectException(ServiceUnavailableHttpException::class);
+
+        $this->service()->logout($this->token());
+    }
+
+    public function test_revoking_all_tokens_of_a_user_fails_closed(): void
+    {
+        $this->revokedTokens->shouldReceive('revokeAllForUser')->once()->with(7)->andThrow(new RedisException('Connection refused'));
+
+        $this->expectException(RedisException::class);
+
+        $this->service()->revokeAllForUser(7);
     }
 
     public function test_redis_being_down_does_not_lock_admins_out(): void

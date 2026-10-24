@@ -5,10 +5,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { HttpAdapterHost } from '@nestjs/core';
+import { GraphQLError } from 'graphql';
 import { AllExceptionsFilter } from '../../filters/all-exceptions.filter.js';
 
 describe('AllExceptionsFilter', () => {
   let reply: ReturnType<typeof vi.fn>;
+  let logError: ReturnType<typeof vi.spyOn>;
   let filter: AllExceptionsFilter;
 
   const host = (type = 'http') =>
@@ -27,7 +29,9 @@ describe('AllExceptionsFilter', () => {
   const replied = () => reply.mock.calls[0] as [unknown, object, number];
 
   beforeEach(() => {
-    vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    logError = vi
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined);
     reply = vi.fn();
     filter = new AllExceptionsFilter({
       httpAdapter: { getRequestUrl: () => '/api/orders', reply },
@@ -79,6 +83,24 @@ describe('AllExceptionsFilter', () => {
 
     expect(replied()[2]).toBe(413);
     expect(replied()[1]).toMatchObject({ error: 'Payload Too Large' });
+  });
+
+  it('returns GraphQL errors for Apollo instead of writing a response', () => {
+    const notFound = filter.catch(
+      new NotFoundException('Product not found'),
+      host('graphql'),
+    ) as GraphQLError;
+    const unexpected = filter.catch(
+      new Error('connection reset'),
+      host('graphql'),
+    ) as GraphQLError;
+
+    expect(reply).not.toHaveBeenCalled();
+    expect(notFound).toBeInstanceOf(GraphQLError);
+    expect(notFound.extensions.code).toBe('NOT_FOUND');
+    expect(unexpected.message).toBe('An unexpected error occurred');
+    expect(unexpected.extensions.code).toBe('INTERNAL_SERVER_ERROR');
+    expect(logError).toHaveBeenCalledTimes(1);
   });
 
   it('does not try to answer non-HTTP contexts', () => {

@@ -22,6 +22,7 @@ class ProductImageService
         private readonly ProductRepository $products,
         private readonly ProductImageRepository $images,
         private readonly ImageResizer $resizer,
+        private readonly CatalogNotifier $catalog,
     ) {}
 
     /** Stores the original and queues the processing; the request returns straight away. */
@@ -84,10 +85,14 @@ class ProductImageService
         }
         $this->images->deleteUpload($uploadPath);
 
-        Log::info($obsoletePath === $newPath ? 'Product image discarded: product gone or a newer upload won' : 'Product image processed', [
-            'product_id' => $productId,
-            'image' => $newPath,
-        ]);
+        if ($obsoletePath === $newPath) {
+            Log::info('Product image discarded: product gone or a newer upload won', ['product_id' => $productId, 'image' => $newPath]);
+
+            return;
+        }
+
+        Log::info('Product image processed', ['product_id' => $productId, 'image' => $newPath]);
+        $this->catalog->catalogChanged('product image changed');
     }
 
     /** Also cancels an upload that is still queued, so it can't bring the image back. */
@@ -109,6 +114,7 @@ class ProductImageService
         }
 
         Log::info('Product image removed', ['product_id' => $product->id]);
+        $this->catalog->catalogChanged('product image removed');
 
         return $product;
     }

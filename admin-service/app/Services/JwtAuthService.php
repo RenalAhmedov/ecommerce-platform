@@ -12,11 +12,13 @@ use Illuminate\Container\Attributes\Config;
 use Illuminate\Support\Facades\Log;
 use LogicException;
 use RedisException;
+use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
 use UnexpectedValueException;
 
 /**
- * Verifies access tokens issued by the Nest api-gateway (HS256, shared secret,
- * claims { sub, email, role, jti, iat, exp }), so one token works for both services.
+ * Verifies and revokes access tokens issued by the Nest api-gateway (HS256,
+ * shared secret, claims { sub, email, role, jti, iat, exp }), so one token
+ * works, and dies, in both services.
  */
 class JwtAuthService
 {
@@ -32,29 +34,79 @@ class JwtAuthService
 
     public function userFromToken(?string $token): ?User
     {
-        if ($token === null || $token === '') {
+        $claims = $this->verify($token);
+
+        return $claims === null ? null : $this->users->findById((int) $claims->sub);
+    }
+
+    /** The claims of a valid token that neither service has revoked, or null. */
+    public function verify(?string $token): ?object
+    {
+        $claims = $this->claims($token);
+
+        if ($claims === null) {
             return null;
         }
 
-        $claims = $this->decode($token);
-
-        if ($claims === null || ! is_numeric($claims->sub ?? null) || ! is_string($claims->jti ?? null)) {
-            return null;
-        }
-
-        if ($this->isRevoked($claims->jti)) {
-            // A logged-out token being reused can mean it was stolen.
+        if ($this->isRevoked($claims)) {
+            // A revoked token being reused can mean it was stolen.
             Log::warning('Revoked access token used', ['jti' => $claims->jti, 'sub' => $claims->sub]);
 
             return null;
         }
 
-        return $this->users->findById((int) $claims->sub);
+        return $claims;
     }
 
-    /** Null for a bad signature, an expired or malformed token, or another algorithm. */
-    private function decode(string $token): ?object
+    /** Re-checks claims verified earlier (a panel session opened with the token): not expired and not revoked since. */
+    public function isActive(object $claims): bool
     {
+        return $claims->exp > time() && ! $this->isRevoked($claims);
+    }
+
+    /** Same contract as the api-gateway's logout: the token is refused by both services until it expires. */
+    public function logout(string $token): void
+    {
+        $claims = $this->claims($token) ?? throw new LogicException('logout() needs a token the jwt guard has accepted.');
+
+        try {
+            $this->revoke($claims);
+        } catch (RedisException $e) {
+            Log::error('Logout failed: Redis unavailable.', ['jti' => $claims->jti, 'error' => $e->getMessage()]);
+
+            throw new ServiceUnavailableHttpException(message: 'Could not log out right now, please retry', previous: $e);
+        }
+    }
+
+    /** @throws RedisException */
+    public function revoke(object $claims): void
+    {
+        $this->revokedTokens->revoke($claims->jti, $claims->exp);
+
+        Log::info('Access token revoked by logout', ['jti' => $claims->jti, 'sub' => $claims->sub]);
+    }
+
+    /**
+     * Kills every token the user holds in both services. Unlike the check, this
+     * fails closed: a deleted or demoted user must not keep a working token, so
+     * the caller's change is rolled back instead.
+     *
+     * @throws RedisException
+     */
+    public function revokeAllForUser(int $userId): void
+    {
+        $this->revokedTokens->revokeAllForUser($userId);
+
+        Log::info('All access tokens of the user revoked', ['target_user_id' => $userId]);
+    }
+
+    /** Null for a bad signature, an expired or malformed token, another algorithm, or missing claims. */
+    private function claims(?string $token): ?object
+    {
+        if ($token === null || $token === '') {
+            return null;
+        }
+
         // php-jwt refuses HS256 keys under 32 bytes; that must surface as a configuration
         // error, not be mistaken for a bad token (which would reject every login silently).
         if (blank($this->secret) || strlen($this->secret) < self::MIN_SECRET_BYTES) {
@@ -62,17 +114,22 @@ class JwtAuthService
         }
 
         try {
-            return JWT::decode($token, new Key($this->secret, self::ALGORITHM));
+            $claims = JWT::decode($token, new Key($this->secret, self::ALGORITHM));
         } catch (UnexpectedValueException|DomainException) {
             return null;
         }
+
+        $valid = is_numeric($claims->sub ?? null) && is_string($claims->jti ?? null)
+            && is_int($claims->iat ?? null) && is_int($claims->exp ?? null);
+
+        return $valid ? $claims : null;
     }
 
     /** Fails open like the Nest guard: Redis being down must not lock every admin out. */
-    private function isRevoked(string $jti): bool
+    private function isRevoked(object $claims): bool
     {
         try {
-            return $this->revokedTokens->isRevoked($jti);
+            return $this->revokedTokens->isRevoked($claims->jti, (int) $claims->sub, $claims->iat);
         } catch (RedisException $e) {
             Log::warning('Token revocation check skipped: Redis unavailable.', ['error' => $e->getMessage()]);
 

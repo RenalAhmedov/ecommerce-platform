@@ -10,6 +10,9 @@ Route::middleware('guest')->group(function () {
     Route::get('login', [AuthenticatedSessionController::class, 'create'])->name('login');
     // Per IP, on top of AuthService's per email+IP lockout: stops one IP trying many accounts.
     Route::post('login', [AuthenticatedSessionController::class, 'store'])->middleware('throttle:20,1');
+    Route::post('login/token', [AuthenticatedSessionController::class, 'storeWithToken'])
+        ->middleware('throttle:20,1')
+        ->name('login.token');
 
     Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])->name('password.request');
     Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])

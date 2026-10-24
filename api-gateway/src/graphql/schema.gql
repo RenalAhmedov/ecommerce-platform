@@ -1,0 +1,148 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+"""A UTC date-time string, such as 2026-10-24T09:54:33.000Z."""
+scalar DateTime
+
+type Order {
+  createdAt: DateTime!
+  id: Int!
+  items: [OrderItem!]!
+  orderNumber: String!
+  paidAt: DateTime
+  paymentReference: String
+  shippingAddress: ShippingAddress
+  status: OrderStatus!
+  subtotal: String!
+  total: String!
+  updatedAt: DateTime!
+}
+
+type OrderItem {
+  id: Int!
+  lineTotal: String!
+  productId: Int!
+  productName: String!
+  quantity: Int!
+  unitPrice: String!
+}
+
+type OrderPage {
+  data: [OrderSummary!]!
+  meta: PaginationMeta!
+}
+
+enum OrderStatus {
+  Cancelled
+  Delivered
+  Paid
+  PaymentFailed
+  Pending
+  Processing
+  Shipped
+}
+
+type OrderSummary {
+  createdAt: DateTime!
+  id: Int!
+  orderNumber: String!
+  paidAt: DateTime
+  status: OrderStatus!
+  subtotal: String!
+  total: String!
+  updatedAt: DateTime!
+}
+
+type PaginationMeta {
+  limit: Int!
+  page: Int!
+  total: Int!
+  totalPages: Int!
+}
+
+type Product {
+  category: ProductCategory
+  createdAt: DateTime!
+  description: String
+  id: Int!
+  imagePath: String
+  isActive: Boolean!
+  name: String!
+
+  """
+  Decimal string, e.g. "12.50"
+  """
+  price: String!
+  sku: String!
+  slug: String!
+  stock: Int!
+  updatedAt: DateTime!
+}
+
+type ProductCategory {
+  id: Int!
+  name: String!
+}
+
+type ProductPage {
+  data: [Product!]!
+  meta: PaginationMeta!
+}
+
+enum ProductSortField {
+  CreatedAt
+  Name
+  Price
+
+  """Best match first (with a search term); otherwise newest first."""
+  Relevance
+}
+
+type Query {
+  """The logged-in user."""
+  me: User!
+
+  """The logged-in user's orders."""
+  myOrders(limit: Int! = 20, page: Int! = 1, status: OrderStatus): OrderPage!
+
+  """An order with its items: your own, or any order for admins."""
+  order(id: Int!): Order!
+
+  """An active product."""
+  product(id: Int!): Product!
+
+  """
+  Active products: the same filters, sorting and Redis cache as GET /api/products.
+  """
+  products(categoryId: Int, limit: Int! = 20, maxPrice: Float, minPrice: Float, page: Int! = 1, search: String, sortBy: ProductSortField! = CreatedAt, sortOrder: SortOrder! = Desc): ProductPage!
+}
+
+type ShippingAddress {
+  city: String!
+
+  """ISO 3166-1 alpha-2 country code"""
+  country: String!
+  fullName: String!
+  line1: String!
+  line2: String
+  postalCode: String!
+}
+
+enum SortOrder {
+  Asc
+  Desc
+}
+
+type User {
+  createdAt: DateTime!
+  email: String!
+  id: Int!
+  name: String!
+  role: UserRole!
+}
+
+enum UserRole {
+  Admin
+  Customer
+}

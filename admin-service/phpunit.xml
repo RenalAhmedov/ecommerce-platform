@@ -23,7 +23,7 @@
         <env name="APP_KEY" value="base64:HlX4cq5DJgWWpZVkzPl1X6FitjPH6dDteb8bMJCS6GE="/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
-        <env name="BROADCAST_CONNECTION" value="null"/>
+        <env name="BROADCAST_CONNECTION" value="null" force="true"/>
         <env name="CACHE_STORE" value="array"/>
         <env name="DB_URL" value=""/>
         <!-- Never the development database: real values come from the Testcontainers started by
@@ -38,6 +38,8 @@
         <env name="REDIS_PORT" value="6379" force="true"/>
         <env name="JWT_SECRET" value="test-secret-for-phpunit-only-0123456789"/>
         <env name="LOG_CHANNEL" value="null"/>
+        <!-- No real webhooks from tests; the tests that check them fake the HTTP call. -->
+        <env name="NEST_API_URL" value="" force="true"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

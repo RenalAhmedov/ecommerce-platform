@@ -4,6 +4,7 @@ import { ProductQueryDto } from '../../dto/product-query.dto.js';
 import type { Product } from '../../entities/product.entity.js';
 import { ProductsCache } from '../../products.cache.js';
 import { ProductsRepository } from '../../products.repository.js';
+import { ProductSearchService } from '../../search/product-search.service.js';
 import { ProductValidator } from '../../validators/product.validator.js';
 import { ProductsReadService } from '../../services/products-read.service.js';
 
@@ -36,6 +37,7 @@ describe('ProductsReadService', () => {
     detail: ReturnType<typeof vi.fn>;
   };
   let validator: { ensureValidPriceRange: ReturnType<typeof vi.fn> };
+  let search: { search: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
     repository = {
@@ -47,6 +49,7 @@ describe('ProductsReadService', () => {
       detail: vi.fn((_id: unknown, load: () => Promise<unknown>) => load()),
     };
     validator = { ensureValidPriceRange: vi.fn() };
+    search = { search: vi.fn() };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -54,6 +57,7 @@ describe('ProductsReadService', () => {
         { provide: ProductsRepository, useValue: repository },
         { provide: ProductsCache, useValue: cache },
         { provide: ProductValidator, useValue: validator },
+        { provide: ProductSearchService, useValue: search },
       ],
     }).compile();
 
@@ -61,6 +65,22 @@ describe('ProductsReadService', () => {
   });
 
   describe('findAll', () => {
+    it('sends a search term to the search service and plain listings to Postgres', async () => {
+      search.search.mockResolvedValue([[buildProduct()], 1]);
+      repository.findActivePaginated.mockResolvedValue([[buildProduct()], 1]);
+      const searching = Object.assign(new ProductQueryDto(), {
+        search: 'keyboard',
+      });
+
+      await service.findAll(searching);
+      await service.findAll(new ProductQueryDto());
+
+      expect(search.search).toHaveBeenCalledWith(
+        expect.objectContaining({ search: 'keyboard' }),
+      );
+      expect(repository.findActivePaginated).toHaveBeenCalledTimes(1);
+    });
+
     it('validates the filters before touching the cache', async () => {
       validator.ensureValidPriceRange.mockImplementation(() => {
         throw new BadRequestException();

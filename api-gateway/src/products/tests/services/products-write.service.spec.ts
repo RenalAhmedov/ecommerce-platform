@@ -6,7 +6,7 @@ import {
 import { Test } from '@nestjs/testing';
 import { InventoryService } from '../../../inventory/inventory.service.js';
 import type { CreateProductDto } from '../../dto/create-product.dto.js';
-import { ProductsCache } from '../../products.cache.js';
+import { ProductChangeNotifier } from '../../product-change.notifier.js';
 import { ProductsRepository } from '../../products.repository.js';
 import { ProductValidator } from '../../validators/product.validator.js';
 import { ProductsWriteService } from '../../services/products-write.service.js';
@@ -22,7 +22,7 @@ describe('ProductsWriteService', () => {
   };
   let repository: { transaction: ReturnType<typeof vi.fn> };
   let inventoryService: { initializeStock: ReturnType<typeof vi.fn> };
-  let cache: { invalidate: ReturnType<typeof vi.fn> };
+  let notifier: { productsChanged: ReturnType<typeof vi.fn> };
   let validator: {
     resolveSlug: ReturnType<typeof vi.fn>;
     ensureHasChanges: ReturnType<typeof vi.fn>;
@@ -61,7 +61,7 @@ describe('ProductsWriteService', () => {
       ),
     };
     inventoryService = { initializeStock: vi.fn() };
-    cache = { invalidate: vi.fn() };
+    notifier = { productsChanged: vi.fn() };
     validator = {
       resolveSlug: vi.fn().mockReturnValue('mechanical-keyboard'),
       ensureHasChanges: vi.fn(),
@@ -74,7 +74,7 @@ describe('ProductsWriteService', () => {
       providers: [
         ProductsWriteService,
         { provide: ProductsRepository, useValue: repository },
-        { provide: ProductsCache, useValue: cache },
+        { provide: ProductChangeNotifier, useValue: notifier },
         { provide: ProductValidator, useValue: validator },
         { provide: InventoryService, useValue: inventoryService },
       ],
@@ -146,15 +146,15 @@ describe('ProductsWriteService', () => {
       );
     });
 
-    it('returns the product read inside the transaction and invalidates the cache after it', async () => {
+    it('returns the product read inside the transaction and announces the change after it', async () => {
       const result = await service.create(createDto, 1);
 
       expect(transactionRepository.getById).toHaveBeenCalledWith(7);
       expect(result).toMatchObject({ id: 7, category: null, stock: 25 });
-      expect(cache.invalidate).toHaveBeenCalledTimes(1);
+      expect(notifier.productsChanged).toHaveBeenCalledTimes(1);
       expect(
         transactionRepository.getById.mock.invocationCallOrder[0],
-      ).toBeLessThan(cache.invalidate.mock.invocationCallOrder[0]);
+      ).toBeLessThan(notifier.productsChanged.mock.invocationCallOrder[0]);
     });
 
     it('checks the category before opening a transaction', async () => {
@@ -168,7 +168,7 @@ describe('ProductsWriteService', () => {
       expect(repository.transaction).not.toHaveBeenCalled();
     });
 
-    it('does not insert or invalidate when the SKU is taken', async () => {
+    it('does not insert or announce anything when the SKU is taken', async () => {
       validator.ensureSkuAvailable.mockRejectedValue(new ConflictException());
 
       await expect(service.create(createDto, 1)).rejects.toThrow(
@@ -176,7 +176,7 @@ describe('ProductsWriteService', () => {
       );
       expect(transactionRepository.create).not.toHaveBeenCalled();
       expect(inventoryService.initializeStock).not.toHaveBeenCalled();
-      expect(cache.invalidate).not.toHaveBeenCalled();
+      expect(notifier.productsChanged).not.toHaveBeenCalled();
     });
   });
 
@@ -186,22 +186,35 @@ describe('ProductsWriteService', () => {
         throw new BadRequestException();
       });
 
-      await expect(service.update(7, {})).rejects.toThrow(BadRequestException);
+      await expect(service.update(7, {}, 1)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(repository.transaction).not.toHaveBeenCalled();
+    });
+
+    it('checks a new category before opening a transaction', async () => {
+      validator.ensureCategoryExists.mockRejectedValue(
+        new BadRequestException('Category not found'),
+      );
+
+      await expect(service.update(7, { categoryId: 404 }, 1)).rejects.toThrow(
+        'Category not found',
+      );
       expect(repository.transaction).not.toHaveBeenCalled();
     });
 
     it('throws NotFound when the product row cannot be locked', async () => {
       transactionRepository.lockById.mockResolvedValue(false);
 
-      await expect(service.update(99, { price: 10 })).rejects.toThrow(
+      await expect(service.update(99, { price: 10 }, 1)).rejects.toThrow(
         NotFoundException,
       );
       expect(transactionRepository.update).not.toHaveBeenCalled();
-      expect(cache.invalidate).not.toHaveBeenCalled();
+      expect(notifier.productsChanged).not.toHaveBeenCalled();
     });
 
     it('only checks uniqueness for the fields that change', async () => {
-      await service.update(7, { price: 10 });
+      await service.update(7, { price: 10 }, 1);
 
       expect(validator.ensureSkuAvailable).not.toHaveBeenCalled();
       expect(validator.ensureSlugAvailable).not.toHaveBeenCalled();
@@ -211,7 +224,7 @@ describe('ProductsWriteService', () => {
     });
 
     it('checks a new SKU and slug while excluding the product itself', async () => {
-      await service.update(7, { sku: 'MK-002', slug: 'keyboard-v2' });
+      await service.update(7, { sku: 'MK-002', slug: 'keyboard-v2' }, 1);
 
       expect(transactionRepository.lockUniqueValues).toHaveBeenCalledWith({
         sku: 'MK-002',
@@ -229,14 +242,14 @@ describe('ProductsWriteService', () => {
       );
     });
 
-    it('returns the product read after the update and invalidates the cache', async () => {
-      const result = await service.update(7, { name: 'Renamed' });
+    it('returns the product read after the update and announces the change', async () => {
+      const result = await service.update(7, { name: 'Renamed' }, 1);
 
       expect(
         transactionRepository.update.mock.invocationCallOrder[0],
       ).toBeLessThan(transactionRepository.getById.mock.invocationCallOrder[0]);
       expect(result).toMatchObject({ id: 7, stock: 25 });
-      expect(cache.invalidate).toHaveBeenCalledTimes(1);
+      expect(notifier.productsChanged).toHaveBeenCalledTimes(1);
     });
   });
 });

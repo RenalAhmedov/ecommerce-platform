@@ -43,6 +43,18 @@ class RequestLoggingTest extends FeatureTestCase
         $this->assertTrue(Str::isUuid(Context::get('request_id')));
     }
 
+    /** Nginx sits on Docker's private network; a public caller can't fake its address with the header. */
+    public function test_the_client_ip_comes_from_nginx_but_only_from_nginx(): void
+    {
+        Log::spy();
+
+        $this->withServerVariables(['REMOTE_ADDR' => '172.18.0.5'])->withHeader('X-Forwarded-For', '203.0.113.9')->get('/login');
+        $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.7'])->withHeader('X-Forwarded-For', '203.0.113.9')->get('/login');
+
+        Log::shouldHaveReceived('info')->with('HTTP request', Mockery::on(fn (array $context) => $context['ip'] === '203.0.113.9'))->once();
+        Log::shouldHaveReceived('info')->with('HTTP request', Mockery::on(fn (array $context) => $context['ip'] === '198.51.100.7'))->once();
+    }
+
     public function test_the_health_check_is_not_logged(): void
     {
         Log::spy();

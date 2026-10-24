@@ -5,6 +5,8 @@ import type { ProductQueryDto } from '../dto/product-query.dto.js';
 import { ProductResponseDto } from '../dto/product-response.dto.js';
 import { ProductsCache } from '../products.cache.js';
 import { ProductsRepository } from '../products.repository.js';
+import { isSearch } from '../search/product-search.query.js';
+import { ProductSearchService } from '../search/product-search.service.js';
 import { ProductValidator } from '../validators/product.validator.js';
 
 @Injectable()
@@ -13,6 +15,7 @@ export class ProductsReadService {
     private readonly productsRepository: ProductsRepository,
     private readonly productsCache: ProductsCache,
     private readonly productValidator: ProductValidator,
+    private readonly productSearchService: ProductSearchService,
   ) {}
 
   findAll(filters: ProductQueryDto): Promise<Paginated<ProductResponseDto>> {
@@ -30,8 +33,9 @@ export class ProductsReadService {
   private async loadProductList(
     filters: ProductQueryDto,
   ): Promise<Paginated<ProductResponseDto>> {
-    const [products, total] =
-      await this.productsRepository.findActivePaginated(filters);
+    const [products, total] = isSearch(filters)
+      ? await this.productSearchService.search(filters)
+      : await this.productsRepository.findActivePaginated(filters);
 
     return toPaginated(
       products.map((product) => ProductResponseDto.fromEntity(product)),

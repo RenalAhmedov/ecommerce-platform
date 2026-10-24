@@ -1,14 +1,31 @@
+import { Field, Int, ObjectType } from '@nestjs/graphql';
 import type { Order } from '../entities/order.entity.js';
-import type { OrderStatus } from '../enums/order-status.enum.js';
+import { OrderStatus } from '../enums/order-status.enum.js';
 
+@ObjectType('OrderSummary')
 export class OrderSummaryResponseDto {
+  @Field(() => Int)
   id: number;
+
+  @Field()
   orderNumber: string;
+
+  @Field(() => OrderStatus)
   status: OrderStatus;
+
+  @Field()
   subtotal: string;
+
+  @Field()
   total: string;
+
+  @Field(() => Date, { nullable: true })
   paidAt: Date | null;
+
+  @Field()
   createdAt: Date;
+
+  @Field()
   updatedAt: Date;
 
   static fromEntity(order: Order): OrderSummaryResponseDto {

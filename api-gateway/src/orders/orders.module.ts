@@ -18,6 +18,7 @@ import { OrderEventsController } from './events/order-events.controller.js';
 import { OrderEventsPublisher } from './events/order-events.publisher.js';
 import { OrdersController } from './orders.controller.js';
 import { OrdersRepository } from './orders.repository.js';
+import { OrdersResolver } from './orders.resolver.js';
 import { ORDER_EMAILS_QUEUE } from './queues/order-emails.constants.js';
 import { OrderEmailsProcessor } from './queues/order-emails.processor.js';
 import { OrderEmailsProducer } from './queues/order-emails.producer.js';
@@ -25,6 +26,7 @@ import { ORDER_MAINTENANCE_QUEUE } from './queues/order-maintenance.constants.js
 import { OrderMaintenanceProcessor } from './queues/order-maintenance.processor.js';
 import { OrderMaintenanceScheduler } from './queues/order-maintenance.scheduler.js';
 import { OrderConfirmationSweepService } from './services/order-confirmation-sweep.service.js';
+import { OrderConfirmationService } from './services/order-confirmation.service.js';
 import { OrderExpiryService } from './services/order-expiry.service.js';
 import { OrderPaymentService } from './services/order-payment.service.js';
 import { OrderPlacementService } from './services/order-placement.service.js';
@@ -59,12 +61,14 @@ import { OrderValidator } from './validators/order.validator.js';
   controllers: [OrdersController, OrderEventsController],
   providers: [
     OrdersRepository,
+    OrdersResolver,
     OrderValidator,
     OrdersReadService,
     OrderPlacementService,
     OrderReleaseService,
     OrderPaymentService,
     OrdersWriteService,
+    OrderConfirmationService,
     OrderEmailsProducer,
     OrderEmailsProcessor,
     OrderEventsPublisher,

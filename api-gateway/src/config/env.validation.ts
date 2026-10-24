@@ -15,12 +15,21 @@ const envValidationSchema = Joi.object<EnvironmentVariables>({
   DB_LOGGING: Joi.boolean().default(false),
 
   JWT_SECRET: Joi.string().min(32).required(),
-  JWT_EXPIRES_IN: Joi.number().integer().positive().default(3600),
+  // At most a day: the admin service keeps a user's token cutoff for a day.
+  JWT_EXPIRES_IN: Joi.number().integer().positive().max(86_400).default(3600),
+
+  INTERNAL_API_KEY: Joi.string().min(32).required(),
 
   REDIS_HOST: Joi.string().default('localhost'),
   REDIS_PORT: Joi.number().port().default(6379),
   REDIS_DB: Joi.number().integer().min(0).max(15).default(0),
   CACHE_TTL_SECONDS: Joi.number().integer().positive().default(60),
+
+  // Empty: product search runs on Postgres only.
+  ELASTICSEARCH_URL: Joi.string()
+    .uri({ scheme: ['http', 'https'] })
+    .allow('')
+    .default(''),
 
   MAIL_HOST: Joi.string().default('localhost'),
   MAIL_PORT: Joi.number().port().default(1025),
@@ -28,6 +37,9 @@ const envValidationSchema = Joi.object<EnvironmentVariables>({
 
   RATE_LIMIT_ENABLED: Joi.boolean().default(true),
   CORS_ORIGINS: Joi.string().allow('').default(''),
+  // Express "trust proxy": whose X-Forwarded-For to believe. The default trusts
+  // private networks, where Nginx sits; it then reports the real client IP.
+  TRUST_PROXY: Joi.string().default('loopback, linklocal, uniquelocal'),
 });
 
 export function validateEnv(

@@ -86,7 +86,8 @@ export class ProductsController {
   update(
     @Param('id', ParseIdPipe) id: number,
     @Body() dto: UpdateProductDto,
+    @Req() req: AuthenticatedRequest,
   ): Promise<ProductResponseDto> {
-    return this.productsWriteService.update(id, dto);
+    return this.productsWriteService.update(id, dto, req.user.sub);
   }
 }

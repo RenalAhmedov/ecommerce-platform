@@ -54,7 +54,7 @@
                                 <td class="px-4 py-3 text-gray-600">{{ $order->created_at->format('Y-m-d H:i') }}</td>
                                 <td class="px-4 py-3 text-right">{{ $order->items_count }}</td>
                                 <td class="px-4 py-3 text-right">{{ $order->total }}</td>
-                                <td class="px-4 py-3"><x-order-status :status="$order->status" /></td>
+                                <td class="px-4 py-3"><x-order-status :status="$order->status" :order="$order->id" /></td>
                             </tr>
                         @empty
                             <tr>

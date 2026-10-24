@@ -9,20 +9,14 @@ Everything runs in Docker: you do not need PHP or Composer installed locally.
 From the repository root:
 
 ```bash
-docker compose up -d          # starts postgres, redis, mailpit, admin-service and admin-worker
+docker compose up -d          # the whole platform: databases, both apps, worker, Nginx
 ```
 
-The panel is served at **http://localhost:8000** (`ADMIN_PORT` in the root `.env`).
+`admin-migrate` runs once before the app starts: it installs the PHP packages when needed and applies this service's migrations (after Nest's `api-migrate`, since Nest owns the shared tables). The app is served by [FrankenPHP](https://frankenphp.dev), a PHP application server that speaks HTTP, so Nginx simply proxies to it; in development each request runs fresh, so code changes apply at once.
 
-First time only (creates `.env` and the encryption key):
+The panel is served through Nginx at **http://localhost:8080** (`HTTP_PORT` in the root `.env`), the same address as the Nest API (`/api`). The container is also reachable directly at http://localhost:8000 (`ADMIN_PORT`) for debugging; `APP_URL` must be the Nginx address, since product image links and emailed links are built from it.
 
-```bash
-cp admin-service/.env.example admin-service/.env
-docker compose run --rm --no-deps admin-service composer install
-docker compose run --rm --no-deps admin-service php artisan key:generate
-docker compose up -d admin-service
-docker compose exec admin-service php artisan storage:link   # serves storage/app/public at /storage
-```
+First time: run [`scripts/setup.sh`](../scripts/setup.sh) from the repository root. It creates `.env` with a fresh `APP_KEY`, Reverb credentials and the secrets shared with the api-gateway, builds the CSS/JS, starts everything and loads the [demo data](#demo-data). After that, `admin-migrate` keeps the PHP packages, the `public/storage` link (product pictures) and the migrations up to date on every start.
 
 Build the CSS/JS (Tailwind + Alpine via Vite) the first time and whenever `resources/css`, `resources/js` or the Blade views change. Node 24 runs in a container, so nothing needs to be installed:
 
@@ -41,6 +35,34 @@ docker compose exec postgres psql -U ecommerce -d ecommerce -c "UPDATE users SET
 ```
 
 Password reset emails go to Mailpit at http://localhost:8025 and are only sent to admin accounts.
+
+### Shared session with the api-gateway
+
+An admin already signed in to the Nest API doesn't need a second login: on the login page, open **"Signed in to the shop API? Use your access token"** and paste the `accessToken` from `POST /api/auth/login` (the form posts to `POST /login/token`, throttled like the password login). The token is sent in the form body, never in the URL, so it can't leak into logs or browser history. It must be valid, not revoked, and belong to an admin; bad, revoked and customer tokens all get the same error.
+
+The panel session is then tied to that token (the session keeps only its `jti`/`sub`/`iat`/`exp`, never the token itself):
+
+- logging out of the API (`POST /api/auth/logout`), or the token being revoked or expiring, ends the panel session on its next request (`EnsureSessionTokenIsActive` middleware, one Redis read per request);
+- logging out of the panel revokes the token, so the API refuses it too. If Redis is down, the panel logout still works and the token dies when it expires.
+
+Sessions opened with a password are not tied to any token. Tokens are only ever issued by the api-gateway, which stays the single place users log in with credentials for the API.
+
+## Demo data
+
+```bash
+docker compose exec admin-service php artisan db:seed                                       # development
+docker compose -f docker-compose.prod.yml exec admin-service php artisan db:seed --force    # production stack
+```
+
+| | |
+|---|---|
+| Admin | `admin@example.com` / `password123` (panel and API) |
+| Customers | 8, e.g. `ada.lovelace@example.com` / `password123` (log in through the Nest API) |
+| Categories | a three-level tree (Electronics → Computers → Laptops, …) |
+| Products | 20 with stock and a picture; some low on stock, one sold out, one inactive |
+| Orders | 24 over the last 30 days (`ORD-DEMO-0001`…) in every status, so the dashboard and reports have history |
+
+The data is fixed (no Faker, which production images don't include) and seeding again only adds what is missing. It goes through the same services as the panel: products get their stock row and ledger entry, pictures go through the real upload pipeline (so the `admin-worker` must be running to process them), and cancelled or declined orders give their stock back, so every stock level matches its ledger. Change the demo passwords before exposing the stack anywhere.
 
 ## Database and migrations
 
@@ -73,11 +95,12 @@ The same product management is available as JSON under **`/admin/api`** (`/api` 
 
 ```bash
 TOKEN=...   # from POST http://localhost:3000/api/auth/login as an admin
-curl -H "Authorization: Bearer $TOKEN" -H "Accept: application/json" "http://localhost:8000/admin/api/products?search=mug&limit=10"
+curl -H "Authorization: Bearer $TOKEN" -H "Accept: application/json" "http://localhost:8080/admin/api/products?search=mug&limit=10"
 ```
 
 | Method | Path | Notes |
 |---|---|---|
+| POST | `/admin/api/auth/logout` | revokes the token in **both** services → 204 (503 if Redis is down, so the client retries) |
 | GET | `/admin/api/products` | `search`, `category_id`, `status` (`active`/`inactive`/`trashed`), `page`, `limit` (≤ 100) |
 | GET | `/admin/api/products/{id}` | |
 | POST | `/admin/api/products` | `name`, `sku`, `price`, optional `slug`, `description`, `category_id`, `is_active`, `initial_stock` → 201 |
@@ -87,7 +110,12 @@ curl -H "Authorization: Bearer $TOKEN" -H "Accept: application/json" "http://loc
 
 Responses use the Nest field names (`isActive`, `imagePath`, `stock`, …) and list pages return `{ data, meta: { page, limit, total, totalPages } }`.
 
-How a token is checked (`App\Services\JwtAuthService`): HS256 signature with `JWT_SECRET` (must equal the api-gateway's), not expired, has `sub` and `jti`, not revoked — the Nest logout key `auth:revoked-token:<jti>` is read from Redis without the `admin:` prefix (fails open if Redis is down, like Nest) — and the user still exists. The **admin role is read from the database**, not from the token, so a demoted admin loses access immediately (403). Rate limit: 120 requests/minute per user.
+How a token is checked (`App\Services\JwtAuthService`): HS256 signature with `JWT_SECRET` (must equal the api-gateway's), not expired, has `sub`, `jti` and `iat`, not revoked, and the user still exists. "Revoked" uses the denylist both services share in Redis (no `admin:` prefix, `App\Repositories\RevokedTokenRepository`), checked in one round trip and failing open if Redis is down, like Nest:
+
+- `auth:revoked-token:<jti>` — one token was logged out (by either service), kept until the token would expire;
+- `auth:user-tokens-valid-after:<userId>` = unix time — every token of that user issued before it is dead. This service writes it when a user is **deleted**, their **role changes** or they get a **new password** (edit, own password change, reset), so they lose their tokens in the api-gateway at once too, not after up to an hour. It is written in the same transaction as the change and fails closed: if Redis is down the change is rolled back rather than leaving a deleted user with a working token. Kept for a day, longer than any token lives (the api-gateway caps `JWT_EXPIRES_IN` at a day).
+
+ The **admin role is read from the database**, not from the token, so a demoted admin loses access immediately (403). Rate limit: 120 requests/minute per user.
 
 ## Dashboard
 
@@ -110,9 +138,10 @@ Revenue means the same as on the dashboard — both use `App\Repositories\SalesR
 `/users` (and `/admin/api/users`) lists customers and admins (search, role filter, deleted users), and creates, edits, deletes and restores them. The rules match the Nest registration exactly, so accounts work in both services:
 
 - emails are trimmed and lower-cased, and unique case-insensitively **including deleted users**, checked under the same advisory lock as Nest (`users.email:<email>`) — a shop sign-up and an admin can't create the same email at the same moment;
-- passwords are 8–72 characters (bcrypt ignores everything after 72 bytes) and stored as `$2y$` bcrypt, cost 12; leaving the password empty on edit keeps it, and a new one signs the user out of "remember me" sessions;
+- passwords are 8–72 characters (bcrypt ignores everything after 72 bytes) and stored as `$2y$` bcrypt, cost 12; leaving the password empty on edit keeps it, and a new one signs the user out of "remember me" sessions and kills their API tokens;
 - an admin can't demote or delete their own account, and the last admin can't be removed — demotions and deletions of admins take a lock (`users.admins`), so two admins removing each other at the same moment can't leave none;
-- deleting is a soft delete: the user can no longer log in (panel, API token or shop), their orders stay, and restoring brings the account back.
+- deleting is a soft delete: the user can no longer log in (panel, API token or shop) and their existing tokens die in both services; their orders stay, and restoring brings the account back;
+- a role change also kills the user's tokens, so nobody keeps a token carrying the old role.
 
 ## Orders
 
@@ -150,6 +179,21 @@ Categories form a tree through `parent_id` (Electronics › Computers › Laptop
 - a subcategory can only be restored after its parent;
 - slugs stay reserved by trashed categories, like product SKUs.
 
+## Catalogue sync with the api-gateway
+
+The Nest api-gateway caches product responses in Redis. When this service changes the catalogue — products (created, updated, deleted, restored), product images, categories, or stock returned by a cancelled order — it tells the gateway through its internal webhook, so the shop shows the change at once:
+
+```
+ProductService / CategoryService / ProductImageService / OrderService
+  └─ after the transaction commits → CatalogNotifier → queued NotifyCatalogChanged job
+        └─ admin-worker → POST {NEST_API_URL}/api/internal/webhooks/catalog   (X-Api-Key: INTERNAL_API_KEY)
+```
+
+- **Queued, with retries** (6 attempts over about 10 minutes), so the panel never waits for the gateway and a gateway restart loses nothing. If every attempt fails the job lands in `failed_jobs`, and the gateway still catches up when its cache entries expire (60 s).
+- **One webhook per burst**: the job is unique until it starts, so an import of 2000 rows sends one notification, not 2000. Changes made while it is being sent queue the next one, so none is missed.
+- **Same event id on every retry**, so the gateway recognises a redelivery and handles it once.
+- Configure `NEST_API_URL` (default `http://host.docker.internal:3000`, the gateway running on your machine) and `INTERNAL_API_KEY` (the same value as in `api-gateway/.env`) in `.env`. An empty `NEST_API_URL` turns the webhook off.
+
 ## Product images
 
 Uploading an image (edit page, or `POST /admin/api/products/{id}/image` as multipart `image`) only stores the original on the private disk and queues `App\Jobs\ProcessProductImage`; the request returns at once (the API answers **202**). The `admin-worker` then:
@@ -160,6 +204,36 @@ Uploading an image (edit page, or `POST /admin/api/products/{id}/image` as multi
 
 Only the newest upload of a product is ever applied (two quick uploads can't end with the older picture), removing an image also cancels an upload still in the queue, and a file that can't be decoded fails the job at once instead of retrying. Uploads are limited to JPEG/PNG/WebP, 5 MB and 8000 px per side.
 
+## Shop search preview (GraphQL)
+
+**Shop search** (`/shop-search`) shows admins what customers get when they search the shop: typos forgiven, best matches first, with price, stock and a link to edit each product. The search (Elasticsearch) lives in the api-gateway, so this page asks its **GraphQL API** (`App\Integrations\NestShopClient` → `POST http://api-gateway:3000/api/graphql`) for exactly the fields it shows:
+
+```graphql
+query ShopSearch($search: String!, $sortBy: ProductSortField!, $sortOrder: SortOrder!, $categoryId: Int, $minPrice: Float, $maxPrice: Float) {
+  products(search: $search, sortBy: $sortBy, sortOrder: $sortOrder, categoryId: $categoryId, minPrice: $minPrice, maxPrice: $maxPrice, limit: 20) {
+    data { id name sku price stock imagePath category { name } }
+    meta { total }
+  }
+}
+```
+
+`ShopSearchService` builds the variables from the form (`ShopSearchRequest`) and also reads `/api/health`: when Elasticsearch is down the page says the shop is on its plain search; when the api-gateway can't be reached it says so instead of failing. The request id travels with the call, so the panel's log line and the api-gateway's share it.
+
+## Live updates (Reverb + Echo)
+
+The panel receives events over WebSockets: [Laravel Reverb](https://reverb.laravel.com) runs as the `reverb` container, and Echo in the browser connects to it through Nginx (`/app`, the same address as the page, so no extra port). Reverb's publishing API (`/apps`) is not exposed; this app reaches it directly on the Docker network (`REVERB_HOST=reverb`).
+
+Events go to one private channel, `admin.orders`. Before joining, Echo asks `POST /broadcasting/auth`, which only answers for logged-in admins (`routes/channels.php`), signed with `REVERB_APP_SECRET`. The key is public (the layout puts it in a `<meta>` tag); the secret never leaves the server. In tests broadcasting is off (`BROADCAST_CONNECTION=null`).
+
+What admins see, on every page of the panel:
+
+| Event | Comes from | In the panel |
+|---|---|---|
+| `order.paid` | a customer paid in the shop: the api-gateway publishes `order.paid` on Redis, and the `admin-events` container (`php artisan orders:listen`) picks it up | a toast "New order ORD-… from Ada Lovelace: 45.00", linking to the order |
+| `order.status-changed` | an admin changed an order's status (`OrderService::changeStatus`) | the order's status badges update in place (orders list, order page, dashboard); the other admins also get a toast |
+
+Both events are queued, so the `admin-worker` sends them to Reverb: a Reverb hiccup is retried instead of failing an admin's request. Redis pub/sub keeps no history, so an `order.paid` published while `admin-events` is down is missed: the order is still there, only the toast is lost.
+
 ## Redis and the queue worker
 
 Sessions, cache and queues use the shared Redis. Every Laravel key starts with `admin:` (`REDIS_PREFIX`), so it never collides with the Nest service's keys (`bull:*`, `idempotency:*`, `products:*`, `auth:*`).
@@ -169,11 +243,11 @@ Sessions, cache and queues use the shared Redis. Every Laravel key starts with `
 | Sessions | 0 | `admin:<session id>` |
 | Queue (`default`) | 0 | `admin:queues:default` |
 | Cache (dashboard figures, category dropdown, image upload markers), login and API rate limiters | 1 | `admin:<cache key>` |
-| Nest keys Laravel reads (JWT revocation) | 0 | `auth:revoked-token:<jti>` — `shared` connection, no prefix |
+| Token denylist shared with Nest (read and written) | 0 | `auth:revoked-token:<jti>`, `auth:user-tokens-valid-after:<userId>` — `shared` connection, no prefix |
 
 The cache lives in its own Redis database because `php artisan cache:clear` runs `FLUSHDB` on it: in database 0 it would also wipe the Nest queues and idempotency keys, and log every admin out.
 
-Queued jobs are run by the `admin-worker` container (`php artisan queue:listen`, which reloads code for every job so edits apply without a restart). A job is tried 3 times; after that it is stored in the Postgres `failed_jobs` table:
+Queued jobs are run by the `admin-worker` container (`php artisan queue:listen` in development, which reloads code for every job so edits apply without a restart; `queue:work` in production, which keeps the app booted and restarts hourly). A job is tried 3 times; after that it is stored in the Postgres `failed_jobs` table:
 
 ```bash
 docker compose logs -f admin-worker

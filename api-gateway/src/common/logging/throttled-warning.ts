@@ -1,7 +1,7 @@
 import type { Logger } from '@nestjs/common';
 
 export class ThrottledWarning {
-  private lastLoggedAt = 0;
+  private lastLoggedAt = Number.NEGATIVE_INFINITY;
 
   constructor(
     private readonly logger: Logger,

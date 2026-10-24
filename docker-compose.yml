@@ -32,6 +32,26 @@ services:
       timeout: 3s
       retries: 10
 
+  # Product search. Optional: without it (or while it is down) the api-gateway
+  # searches Postgres instead. Security is off because only this Docker network
+  # (and, in development, 127.0.0.1) can reach it; a public deployment turns it on.
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.5.3
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    ports:
+      - "127.0.0.1:${ELASTICSEARCH_PORT:-9200}:9200"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=2s' >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
   mailpit:
     image: axllent/mailpit:v1.20
     restart: unless-stopped
@@ -39,24 +59,169 @@ services:
       - "127.0.0.1:${MAIL_SMTP_PORT:-1025}:1025"
       - "127.0.0.1:${MAIL_UI_PORT:-8025}:8025"
 
+  # The single entry point: http://localhost:8080 (/api → api-gateway, everything else → admin-service).
+  nginx:
+    image: nginx:1.28-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${HTTP_PORT:-8080}:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1/nginx-health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+      admin-service:
+        condition: service_healthy
+      reverb:
+        condition: service_healthy
+
+  # Runs the Nest migrations once and exits. Nest owns the shared schema, so
+  # both apps (and the admin service's own migrations) wait for it to succeed.
+  api-migrate:
+    build:
+      context: ./api-gateway
+      target: dev
+    image: ecommerce-platform-api-gateway-dev
+    # Installs node_modules first whenever package-lock.json changed (all Nest dev services do).
+    entrypoint: &api-gateway-entrypoint ["sh", "docker/install-dependencies.sh"]
+    command: ["npm", "run", "migration:run"]
+    volumes: &api-gateway-volumes
+      - ./api-gateway:/app
+      # Linux packages stay in a volume, never mixed with a node_modules installed on the host.
+      - api-gateway-node-modules:/app/node_modules
+    # Overrides the host-oriented values in api-gateway/.env (real environment variables win over .env).
+    environment: &api-gateway-environment
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${DB_DATABASE:-ecommerce}
+      DB_USERNAME: ${DB_USERNAME:-ecommerce}
+      DB_PASSWORD: ${DB_PASSWORD:-secret}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api-gateway:
+    image: ecommerce-platform-api-gateway-dev
+    build:
+      context: ./api-gateway
+      target: dev
+    restart: unless-stopped
+    entrypoint: *api-gateway-entrypoint
+    command: ["npm", "run", "start:dev"]
+    volumes: *api-gateway-volumes
+    environment: *api-gateway-environment
+    ports:
+      - "127.0.0.1:${API_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:3000/api/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      # Watch mode compiles everything before it listens.
+      start_period: 90s
+    depends_on:
+      api-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  # The admin service's own tables (password resets, failed jobs, imports). Runs
+  # after Nest's migrations; first installs the PHP packages when needed and links
+  # public/storage (product pictures), which git doesn't keep.
+  admin-migrate:
+    build:
+      context: ./admin-service
+      target: dev
+    image: ecommerce-platform-admin-service
+    command: ["sh", "-c", "composer install --no-interaction --no-progress --quiet && php artisan storage:link --quiet && php artisan migrate --force"]
+    volumes:
+      - ./admin-service:/var/www/html
+    depends_on:
+      api-migrate:
+        condition: service_completed_successfully
+
   admin-service: &admin-service
-    build: ./admin-service
+    build:
+      context: ./admin-service
+      target: dev
     image: ecommerce-platform-admin-service
     restart: unless-stopped
     volumes:
       - ./admin-service:/var/www/html
     ports:
       - "127.0.0.1:${ADMIN_PORT:-8000}:8000"
+    environment:
+      NEST_API_URL: http://api-gateway:3000
+    # Replaces the base image's check, which probes a FrankenPHP port only the web server has.
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:8000/up"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
     depends_on:
-      postgres:
-        condition: service_healthy
+      admin-migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
 
+  # WebSocket server for the panel's live updates; browsers reach it through Nginx (/app).
+  reverb:
+    <<: *admin-service
+    command: ["php", "artisan", "reverb:start", "--host=0.0.0.0", "--port=8080"]
+    ports: []
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:8080/up"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # Turns the api-gateway's order.paid events (Redis pub/sub) into live notifications in the panel.
+  admin-events:
+    <<: *admin-service
+    command: ["php", "artisan", "orders:listen"]
+    ports: []
+    healthcheck:
+      disable: true
+
+  # Development: queue:listen reloads the code for every job. Production uses queue:work.
   admin-worker:
     <<: *admin-service
     command: ["php", "artisan", "queue:listen", "--tries=3", "--timeout=60"]
     ports: []
+    healthcheck:
+      disable: true
+
+  # Test runner only, never started by `up`:
+  #   docker compose run --rm api-tests                      (unit + integration tests)
+  #   docker compose run --rm api-tests npm run lint         (any npm script)
+  # Like admin-tests below: Testcontainers starts throwaway Postgres, Redis and
+  # Elasticsearch through the Docker socket and reaches them through the host.
+  api-tests:
+    image: ecommerce-platform-api-gateway-dev
+    build:
+      context: ./api-gateway
+      target: dev
+    profiles: ["test"]
+    entrypoint: *api-gateway-entrypoint
+    command: ["sh", "-c", "npm test && npm run test:integration"]
+    volumes:
+      - ./api-gateway:/app
+      - api-gateway-node-modules:/app/node_modules
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      TESTCONTAINERS_HOST_OVERRIDE: host.docker.internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   # Test runner only, never started by `up`:
   #   docker compose run --rm admin-tests                      (all tests)
@@ -66,7 +231,9 @@ services:
   # are reached through the host; the app containers above get no socket access.
   admin-tests:
     image: ecommerce-platform-admin-service
-    build: ./admin-service
+    build:
+      context: ./admin-service
+      target: dev
     profiles: ["test"]
     entrypoint: ["sh", "-c", "[ -f .env ] || cp .env.example .env; composer install --no-interaction --no-progress --quiet && exec php artisan test \"$$@\"", "--"]
     command: []
@@ -93,4 +260,6 @@ services:
 volumes:
   postgres-data:
   redis-data:
+  elasticsearch-data:
+  api-gateway-node-modules:
   admin-node-modules:

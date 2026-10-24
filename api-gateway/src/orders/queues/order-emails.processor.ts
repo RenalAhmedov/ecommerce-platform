@@ -3,9 +3,7 @@ import { Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
 import { ThrottledWarning } from '../../common/logging/throttled-warning.js';
 import { describeError } from '../../common/utils/describe-error.js';
-import { MailService } from '../../mail/mail.service.js';
-import { renderOrderConfirmation } from '../mail/order-confirmation.mail.js';
-import { OrdersRepository } from '../orders.repository.js';
+import { OrderConfirmationService } from '../services/order-confirmation.service.js';
 import type { OrderConfirmationJobData } from './interfaces/order-confirmation-job.interface.js';
 import { ORDER_EMAILS_QUEUE } from './order-emails.constants.js';
 
@@ -15,28 +13,13 @@ export class OrderEmailsProcessor extends WorkerHost {
   private readonly connectionWarning = new ThrottledWarning(this.logger);
 
   constructor(
-    private readonly ordersRepository: OrdersRepository,
-    private readonly mailService: MailService,
+    private readonly orderConfirmationService: OrderConfirmationService,
   ) {
     super();
   }
 
-  async process(job: Job<OrderConfirmationJobData>): Promise<void> {
-    const order = await this.ordersRepository.findForConfirmation(
-      job.data.orderId,
-    );
-
-    if (!order) {
-      this.logger.warn(
-        `Order ${job.data.orderId} no longer exists, skipping its confirmation email`,
-      );
-      return;
-    }
-
-    await this.mailService.send({
-      to: order.user.email,
-      ...renderOrderConfirmation(order),
-    });
+  process(job: Job<OrderConfirmationJobData>): Promise<void> {
+    return this.orderConfirmationService.send(job.data.orderId);
   }
 
   @OnWorkerEvent('failed')

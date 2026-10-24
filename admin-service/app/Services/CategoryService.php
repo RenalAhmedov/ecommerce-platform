@@ -25,6 +25,7 @@ class CategoryService
     public function __construct(
         private readonly CategoryRepository $categories,
         private readonly Cache $cache,
+        private readonly CatalogNotifier $catalog,
     ) {}
 
     /**
@@ -94,6 +95,7 @@ class CategoryService
             return $this->categories->create($data);
         });
         $this->forgetOptions();
+        $this->catalog->catalogChanged('category changed');
 
         Log::info('Category created', ['category_id' => $category->id, 'slug' => $category->slug, 'parent_id' => $category->parent_id]);
 
@@ -119,9 +121,9 @@ class CategoryService
 
             return $changed;
         });
-        $this->forgetOptions();
-
         if ($changed !== []) {
+            $this->forgetOptions();
+            $this->catalog->catalogChanged('category changed');
             Log::info('Category updated', ['category_id' => $category->id, 'changed' => $changed]);
         }
 
@@ -146,6 +148,7 @@ class CategoryService
             $this->categories->delete($category);
         });
         $this->forgetOptions();
+        $this->catalog->catalogChanged('category changed');
 
         Log::info('Category moved to trash', ['category_id' => $category->id, 'slug' => $category->slug]);
     }
@@ -164,6 +167,7 @@ class CategoryService
             $this->categories->restore($category);
         });
         $this->forgetOptions();
+        $this->catalog->catalogChanged('category changed');
 
         Log::info('Category restored', ['category_id' => $category->id, 'slug' => $category->slug]);
     }

@@ -19,7 +19,10 @@ describe('JwtAuthGuard', () => {
       getType: () => type,
       getHandler: () => undefined,
       getClass: () => undefined,
-      switchToHttp: () => ({ getRequest: () => request }),
+      switchToHttp: () => ({
+        getRequest: () => request,
+        getResponse: () => ({}),
+      }),
     }) as unknown as ExecutionContext;
 
   const payload = {
@@ -86,6 +89,14 @@ describe('JwtAuthGuard', () => {
     );
   });
 
+  it('rejects a token without an issue time, which no cutoff could catch', async () => {
+    request.headers.authorization = `Bearer ${await jwtService.signAsync(payload, { noTimestamp: true })}`;
+
+    await expect(guard.canActivate(context())).rejects.toThrow(
+      new UnauthorizedException('Invalid or expired access token'),
+    );
+  });
+
   it('rejects a revoked token', async () => {
     await authorize();
     revokedTokenStore.isRevoked.mockResolvedValue(true);
@@ -93,7 +104,9 @@ describe('JwtAuthGuard', () => {
     await expect(guard.canActivate(context())).rejects.toThrow(
       new UnauthorizedException('Access token has been revoked'),
     );
-    expect(revokedTokenStore.isRevoked).toHaveBeenCalledWith('token-1');
+    expect(revokedTokenStore.isRevoked).toHaveBeenCalledWith(
+      expect.objectContaining({ jti: 'token-1', sub: 7 }),
+    );
     expect(request.user).toBeUndefined();
   });
 

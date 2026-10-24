@@ -8,18 +8,30 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use RedisException;
 
 /**
  * Only admins may use the panel. Customers get exactly the same replies as
  * unknown emails, so the login and reset forms never reveal who has an account.
+ *
+ * A panel session can also be opened with an access token from the api-gateway
+ * (shared session). The session then lives and dies with that token: a logout
+ * in either service, or the token expiring, ends both.
  */
 class AuthService
 {
     private const MAX_LOGIN_ATTEMPTS = 5;
 
-    public function __construct(private readonly UserService $users) {}
+    /** The claims (never the token itself) of the token a panel session was opened with. */
+    private const TOKEN_SESSION_KEY = 'auth.access_token';
+
+    public function __construct(
+        private readonly UserService $users,
+        private readonly JwtAuthService $tokens,
+    ) {}
 
     /** @throws ValidationException */
     public function login(string $email, string $password, bool $remember, string $ip): void
@@ -48,9 +60,55 @@ class AuthService
         Log::info('Admin logged in', ['user_id' => Auth::guard('web')->id(), 'ip' => $ip]);
     }
 
+    /** @throws ValidationException */
+    public function loginWithToken(string $token, string $ip): void
+    {
+        $claims = $this->tokens->verify($token);
+        $user = $claims === null ? null : $this->users->find((int) $claims->sub);
+
+        // One reply for bad, revoked and customer tokens, like the password form.
+        if (! $user?->isAdmin()) {
+            Log::warning('Admin token login refused', ['sub' => $claims?->sub, 'ip' => $ip]);
+
+            throw ValidationException::withMessages(['token' => __('This access token cannot open the admin panel.')]);
+        }
+
+        Auth::guard('web')->login($user);
+        Session::put(self::TOKEN_SESSION_KEY, ['jti' => $claims->jti, 'sub' => $claims->sub, 'iat' => $claims->iat, 'exp' => $claims->exp]);
+
+        Log::info('Admin logged in with an api-gateway token', ['user_id' => $user->id, 'jti' => $claims->jti, 'ip' => $ip]);
+    }
+
+    /** Signs out a panel session whose token was logged out, revoked or has expired. True when it did. */
+    public function endSessionIfTokenEnded(): bool
+    {
+        $claims = Session::get(self::TOKEN_SESSION_KEY);
+
+        if ($claims === null || $this->tokens->isActive((object) $claims)) {
+            return false;
+        }
+
+        Log::info('Panel session ended with its access token', ['user_id' => Auth::guard('web')->id(), 'jti' => $claims['jti']]);
+        Auth::guard('web')->logout();
+
+        return true;
+    }
+
+    /** A session opened with a token also revokes that token, so the logout counts in the api-gateway too. */
     public function logout(): void
     {
         $userId = Auth::guard('web')->id();
+        $claims = Session::get(self::TOKEN_SESSION_KEY);
+
+        if ($claims !== null) {
+            try {
+                $this->tokens->revoke((object) $claims);
+            } catch (RedisException $e) {
+                // Leaving the panel must always work; the token still dies when it expires.
+                Log::warning('Panel logout could not revoke its access token: Redis unavailable.', ['jti' => $claims['jti'], 'error' => $e->getMessage()]);
+            }
+        }
+
         Auth::guard('web')->logout();
 
         Log::info('Admin logged out', ['user_id' => $userId]);

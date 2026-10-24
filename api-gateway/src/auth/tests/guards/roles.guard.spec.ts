@@ -12,7 +12,10 @@ describe('RolesGuard', () => {
       getType: () => type,
       getHandler: () => undefined,
       getClass: () => undefined,
-      switchToHttp: () => ({ getRequest: () => ({ user }) }),
+      switchToHttp: () => ({
+        getRequest: () => ({ user }),
+        getResponse: () => ({}),
+      }),
     }) as unknown as ExecutionContext;
 
   beforeEach(() => {
