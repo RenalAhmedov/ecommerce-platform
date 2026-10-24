@@ -1,5 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Redis } from 'ioredis';
 import type { AddressInfo } from 'node:net';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -46,7 +47,9 @@ export class TestApp {
       .useValue({ sendMail, close: vi.fn() })
       .compile();
 
-    const app = moduleRef.createNestApplication({ logger: false });
+    const app = moduleRef.createNestApplication<NestExpressApplication>({
+      logger: false,
+    });
     configureApp(app);
     connectEventListener(app);
     await app.startAllMicroservices();

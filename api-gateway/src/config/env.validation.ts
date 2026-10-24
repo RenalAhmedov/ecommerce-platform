@@ -31,6 +31,9 @@ const envValidationSchema = Joi.object<EnvironmentVariables>({
 
   RATE_LIMIT_ENABLED: Joi.boolean().default(true),
   CORS_ORIGINS: Joi.string().allow('').default(''),
+  // Express "trust proxy": whose X-Forwarded-For to believe. The default trusts
+  // private networks, where Nginx sits; it then reports the real client IP.
+  TRUST_PROXY: Joi.string().default('loopback, linklocal, uniquelocal'),
 });
 
 export function validateEnv(

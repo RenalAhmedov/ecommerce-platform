@@ -1,6 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { CustomStrategy } from '@nestjs/microservices';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import type { EnvironmentVariables } from './config/interfaces/environment-variables.interface.js';
@@ -16,7 +17,7 @@ const EXPOSED_HEADERS = [
   'X-Request-Id',
 ];
 
-export function configureApp(app: INestApplication): void {
+export function configureApp(app: NestExpressApplication): void {
   const config = getConfig(app);
   const allowedOrigins = config
     .get('CORS_ORIGINS')
@@ -24,6 +25,8 @@ export function configureApp(app: INestApplication): void {
     .map((origin: string) => origin.trim())
     .filter(Boolean);
 
+  // Behind Nginx: req.ip (rate limits, logs) becomes the client's address, not the proxy's.
+  app.set('trust proxy', config.get('TRUST_PROXY'));
   app.setGlobalPrefix('api');
   app.enableShutdownHooks();
   app.use(helmet());

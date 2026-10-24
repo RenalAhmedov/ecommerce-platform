@@ -40,6 +40,23 @@ describe('Rate limiting (integration)', () => {
     expect(responses[0].headers.get('x-ratelimit-limit')).toBe('5');
   });
 
+  it('counts each client behind the proxy separately, by its X-Forwarded-For address', async () => {
+    const loginFrom = (ip: string) =>
+      testApp.request('POST', '/auth/login', {
+        body: { email: 'nobody@example.test', password: 'password123' },
+        headers: { 'x-forwarded-for': ip },
+      });
+
+    const first: number[] = [];
+    for (let attempt = 0; attempt < 6; attempt++) {
+      first.push((await loginFrom('203.0.113.1')).status);
+    }
+    const second = await loginFrom('203.0.113.2');
+
+    expect(first).toEqual([401, 401, 401, 401, 401, 429]);
+    expect(second.status).toBe(401);
+  });
+
   it('limits orders per user, so customers behind the same IP keep their own quota', async () => {
     const { token: adminToken } = await testApp.signUp(
       'admin@example.test',

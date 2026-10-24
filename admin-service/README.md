@@ -12,7 +12,7 @@ From the repository root:
 docker compose up -d          # starts postgres, redis, mailpit, admin-service and admin-worker
 ```
 
-The panel is served at **http://localhost:8000** (`ADMIN_PORT` in the root `.env`).
+The panel is served through Nginx at **http://localhost:8080** (`HTTP_PORT` in the root `.env`), the same address as the Nest API (`/api`). The container is also reachable directly at http://localhost:8000 (`ADMIN_PORT`) for debugging; `APP_URL` must be the Nginx address, since product image links and emailed links are built from it.
 
 First time only (creates `.env` and the encryption key):
 
@@ -84,7 +84,7 @@ The same product management is available as JSON under **`/admin/api`** (`/api` 
 
 ```bash
 TOKEN=...   # from POST http://localhost:3000/api/auth/login as an admin
-curl -H "Authorization: Bearer $TOKEN" -H "Accept: application/json" "http://localhost:8000/admin/api/products?search=mug&limit=10"
+curl -H "Authorization: Bearer $TOKEN" -H "Accept: application/json" "http://localhost:8080/admin/api/products?search=mug&limit=10"
 ```
 
 | Method | Path | Notes |

@@ -19,4 +19,5 @@ export interface EnvironmentVariables {
   MAIL_FROM: string;
   RATE_LIMIT_ENABLED: boolean;
   CORS_ORIGINS: string;
+  TRUST_PROXY: string;
 }

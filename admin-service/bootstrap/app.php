@@ -17,6 +17,9 @@ return Application::configure(basePath: dirname(__DIR__))
         apiPrefix: 'admin/api',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Nginx (on Docker's private network) is the only way in: believe its
+        // X-Forwarded-* headers, so request()->ip(), https and redirect URLs are the client's.
+        $middleware->trustProxies(at: ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16']);
         $middleware->append(LogRequests::class);
         $middleware->web(append: EnsureSessionTokenIsActive::class);
         $middleware->alias([

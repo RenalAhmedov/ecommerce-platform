@@ -16,6 +16,7 @@ describe('validateEnv', () => {
       JWT_EXPIRES_IN: 3600,
       REDIS_DB: 0,
       RATE_LIMIT_ENABLED: true,
+      TRUST_PROXY: 'loopback, linklocal, uniquelocal',
     });
   });
 
