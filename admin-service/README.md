@@ -55,6 +55,23 @@ The panel session is then tied to that token (the session keeps only its `jti`/`
 
 Sessions opened with a password are not tied to any token. Tokens are only ever issued by the api-gateway, which stays the single place users log in with credentials for the API.
 
+## Demo data
+
+```bash
+docker compose exec admin-service php artisan db:seed                                       # development
+docker compose -f docker-compose.prod.yml exec admin-service php artisan db:seed --force    # production stack
+```
+
+| | |
+|---|---|
+| Admin | `admin@example.com` / `password123` (panel and API) |
+| Customers | 8, e.g. `ada.lovelace@example.com` / `password123` (log in through the Nest API) |
+| Categories | a three-level tree (Electronics → Computers → Laptops, …) |
+| Products | 20 with stock and a picture; some low on stock, one sold out, one inactive |
+| Orders | 24 over the last 30 days (`ORD-DEMO-0001`…) in every status, so the dashboard and reports have history |
+
+The data is fixed (no Faker, which production images don't include) and seeding again only adds what is missing. It goes through the same services as the panel: products get their stock row and ledger entry, pictures go through the real upload pipeline (so the `admin-worker` must be running to process them), and cancelled or declined orders give their stock back, so every stock level matches its ledger. Change the demo passwords before exposing the stack anywhere.
+
 ## Database and migrations
 
 Both services share one PostgreSQL database, so table ownership is explicit:
