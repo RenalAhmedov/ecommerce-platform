@@ -6,10 +6,24 @@ First-time setup (Docker, `.env`, migrations) is described in the [root README](
 
 ## Run
 
+With Docker (from the repository root), no local Node.js needed:
+
 ```bash
-npm run start:dev   # watch mode
-npm run start:prod  # compiled build (run `npm run build` first)
+docker compose up -d          # api-migrate runs the migrations, then api-gateway starts in watch mode
+docker compose logs -f api-gateway
 ```
+
+`api-migrate` is a one-shot service: it applies pending migrations and exits, and both apps wait for it to succeed (this service owns the shared schema). Code changes reload automatically. After changing `package.json`, rebuild with `docker compose build api-gateway` and recreate the `node_modules` volume (`docker compose down` then `docker volume rm ecommerce-platform_api-gateway-node-modules`).
+
+Without Docker for the app itself: `npm run start:dev` (stop the `api-gateway` container first, it uses port 3000).
+
+### Health check
+
+`GET /api/health` → `200 {"status":"ok","checks":{"database":"up","redis":"up"}}`. `"degraded"` (still 200) means Redis is down, which every feature survives; no database means `503`. Docker uses it for the container's health, and it is never rate-limited or logged.
+
+### Docker image
+
+The `Dockerfile` has two targets: `dev` (dependencies only; compose mounts the source) and `prod` (compiled JavaScript and production dependencies only, runs as the unprivileged `node` user, built-in `HEALTHCHECK`). Migrations for a production deployment: `npm run typeorm -- migration:run` with the same image, before starting new instances.
 
 ## API documentation
 

@@ -39,6 +39,56 @@ services:
       - "127.0.0.1:${MAIL_SMTP_PORT:-1025}:1025"
       - "127.0.0.1:${MAIL_UI_PORT:-8025}:8025"
 
+  # Runs the Nest migrations once and exits. Nest owns the shared schema, so
+  # both apps (and the admin service's own migrations) wait for it to succeed.
+  api-migrate:
+    build:
+      context: ./api-gateway
+      target: dev
+    image: ecommerce-platform-api-gateway-dev
+    command: ["npm", "run", "migration:run"]
+    volumes: &api-gateway-volumes
+      - ./api-gateway:/app
+      # Linux packages stay in a volume, never mixed with a node_modules installed on the host.
+      - api-gateway-node-modules:/app/node_modules
+    # Overrides the host-oriented values in api-gateway/.env (real environment variables win over .env).
+    environment: &api-gateway-environment
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${DB_DATABASE:-ecommerce}
+      DB_USERNAME: ${DB_USERNAME:-ecommerce}
+      DB_PASSWORD: ${DB_PASSWORD:-secret}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api-gateway:
+    image: ecommerce-platform-api-gateway-dev
+    build:
+      context: ./api-gateway
+      target: dev
+    restart: unless-stopped
+    volumes: *api-gateway-volumes
+    environment: *api-gateway-environment
+    ports:
+      - "127.0.0.1:${API_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:3000/api/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      # Watch mode compiles everything before it listens.
+      start_period: 90s
+    depends_on:
+      api-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
   admin-service: &admin-service
     build: ./admin-service
     image: ecommerce-platform-admin-service
@@ -47,10 +97,11 @@ services:
       - ./admin-service:/var/www/html
     ports:
       - "127.0.0.1:${ADMIN_PORT:-8000}:8000"
-    # Reaches the Nest api-gateway running on the host (Docker Desktop has this name built in; Linux needs the mapping).
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    environment:
+      NEST_API_URL: http://api-gateway:3000
     depends_on:
+      api-migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
@@ -96,4 +147,5 @@ services:
 volumes:
   postgres-data:
   redis-data:
+  api-gateway-node-modules:
   admin-node-modules:

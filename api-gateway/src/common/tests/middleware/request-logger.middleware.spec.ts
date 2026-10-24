@@ -66,6 +66,18 @@ describe('RequestLoggerMiddleware', () => {
     expect(id).toMatch(/^[0-9a-f-]{36}$/);
   });
 
+  it('tags but never logs the health check that Docker polls', () => {
+    const next = handle({
+      ...request(),
+      originalUrl: '/api/health',
+    } as unknown as Request);
+    response.emit('finish');
+
+    expect(next).toHaveBeenCalled();
+    expect(response.setHeader).toHaveBeenCalled();
+    expect(log).not.toHaveBeenCalled();
+  });
+
   it('logs client errors as warnings', () => {
     handle(request());
     response.statusCode = 404;
