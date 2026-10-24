@@ -4,9 +4,11 @@ import {
   NestModule,
   ValidationPipe,
 } from '@nestjs/common';
+import { ApolloDriver, type ApolloDriverConfig } from '@nestjs/apollo';
 import { BullModule } from '@nestjs/bullmq';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_FILTER, APP_PIPE } from '@nestjs/core';
+import { GraphQLModule } from '@nestjs/graphql';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './auth/auth.module.js';
 import { CacheModule } from './cache/cache.module.js';
@@ -15,6 +17,7 @@ import { RequestLoggerMiddleware } from './common/middleware/request-logger.midd
 import { validateEnv } from './config/env.validation.js';
 import type { EnvironmentVariables } from './config/interfaces/environment-variables.interface.js';
 import { createDataSourceOptions } from './database/database.config.js';
+import { createGraphqlOptions } from './graphql/graphql.config.js';
 import { HealthModule } from './health/health.module.js';
 import { createQueueConnectionOptions } from './messaging/queue-connection.options.js';
 import { OrdersModule } from './orders/orders.module.js';
@@ -45,6 +48,11 @@ import { WebhooksModule } from './webhooks/webhooks.module.js';
       useFactory: (config: ConfigService<EnvironmentVariables, true>) => ({
         connection: createQueueConnectionOptions(config),
       }),
+    }),
+    GraphQLModule.forRootAsync<ApolloDriverConfig>({
+      driver: ApolloDriver,
+      inject: [ConfigService],
+      useFactory: createGraphqlOptions,
     }),
     CacheModule,
     AuthModule,

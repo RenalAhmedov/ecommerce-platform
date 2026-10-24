@@ -57,6 +57,23 @@ describe('Rate limiting (integration)', () => {
     expect(second.status).toBe(401);
   });
 
+  it('counts GraphQL queries too, so it is no way around the limit', async () => {
+    const statuses: (string | undefined)[] = [];
+    for (let attempt = 0; attempt < 101; attempt++) {
+      const { body } = await testApp.request<{
+        errors?: { extensions: { code: string } }[];
+      }>('POST', '/graphql', {
+        body: { query: '{ products { meta { total } } }' },
+      });
+      statuses.push(body.errors?.[0].extensions.code);
+    }
+
+    expect(statuses.slice(0, 100).every((code) => code === undefined)).toBe(
+      true,
+    );
+    expect(statuses[100]).toBe('TOO_MANY_REQUESTS');
+  });
+
   it('limits orders per user, so customers behind the same IP keep their own quota', async () => {
     const { token: adminToken } = await testApp.signUp(
       'admin@example.test',

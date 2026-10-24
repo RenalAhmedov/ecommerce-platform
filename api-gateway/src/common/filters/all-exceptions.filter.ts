@@ -4,10 +4,14 @@ import {
   ExceptionFilter,
   HttpException,
   HttpStatus,
+  InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
+import type { GqlContextType } from '@nestjs/graphql';
 import { STATUS_CODES } from 'node:http';
+import { GraphQLError } from 'graphql';
+import { httpToGraphqlError } from '../../graphql/http-to-graphql-error.js';
 import type { ErrorResponseDto } from '../dto/error-response.dto.js';
 
 @Catch()
@@ -16,7 +20,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
   constructor(private readonly httpAdapterHost: HttpAdapterHost) {}
 
-  catch(exception: unknown, host: ArgumentsHost): void {
+  /** HTTP: writes the JSON error. GraphQL: returns the error, which Apollo puts in "errors". */
+  catch(exception: unknown, host: ArgumentsHost): unknown {
+    if (host.getType<GqlContextType>() === 'graphql') {
+      return this.toGraphqlError(exception);
+    }
+
     if (host.getType() !== 'http') {
       this.logger.error(
         `Unhandled ${host.getType()} error`,
@@ -43,6 +52,25 @@ export class AllExceptionsFilter implements ExceptionFilter {
     }
 
     httpAdapter.reply(ctx.getResponse(), body, body.statusCode);
+  }
+
+  private toGraphqlError(exception: unknown): GraphQLError {
+    if (exception instanceof GraphQLError) {
+      return exception;
+    }
+
+    if (!(exception instanceof HttpException)) {
+      this.logger.error(
+        'Unhandled GraphQL error',
+        exception instanceof Error ? exception.stack : String(exception),
+      );
+    }
+
+    return httpToGraphqlError(
+      exception instanceof HttpException
+        ? exception
+        : new InternalServerErrorException('An unexpected error occurred'),
+    );
   }
 
   private toStatusAndMessage(

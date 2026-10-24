@@ -8,6 +8,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
+import { httpContextOf } from '../../common/utils/http-context.js';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator.js';
 import type { AuthenticatedRequest } from '../interfaces/authenticated-request.interface.js';
 import type { AccessTokenClaims } from '../interfaces/jwt-payload.interface.js';
@@ -24,7 +25,9 @@ export class JwtAuthGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    if (context.getType() !== 'http') {
+    const http = httpContextOf<AuthenticatedRequest>(context);
+
+    if (!http) {
       return true;
     }
 
@@ -37,7 +40,7 @@ export class JwtAuthGuard implements CanActivate {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    const request = http.req;
     const claims = await this.verify(this.extractBearerToken(request));
 
     if (await this.revokedTokenStore.isRevoked(claims)) {

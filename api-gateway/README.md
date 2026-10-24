@@ -37,6 +37,32 @@ Interactive Swagger UI: **http://localhost:3000/api/docs** (raw OpenAPI JSON at 
 - **Security headers** via `helmet` (CSP, HSTS, no-sniff, frame protection, no `X-Powered-By`).
 - **CORS** is off unless `CORS_ORIGINS` lists allowed browser origins (comma-separated).
 
+## GraphQL
+
+A read-only GraphQL API at **`POST /api/graphql`** (also through Nginx: http://localhost:8080/api/graphql), next to the REST API. The resolvers call the same services as the REST controllers, so the Redis cache, access rules, validation, rate limits and errors are shared; writes stay in REST, where checkout has its Idempotency-Key handling. The schema is in [`src/graphql/schema.gql`](src/graphql/schema.gql), regenerated from the decorated classes on every start outside production, so every change to the API shows up in review.
+
+| Query | Access |
+|---|---|
+| `products(search, categoryId, minPrice, maxPrice, sortBy, sortOrder, page, limit)` | public |
+| `product(id)` | public |
+| `me` | logged in |
+| `myOrders(status, page, limit)` | logged in |
+| `order(id)` | your own order, or any order for admins |
+
+```bash
+curl -s localhost:8080/api/graphql -H 'Content-Type: application/json' \
+  -d '{"query":"{ products(limit: 3, sortBy: Price, sortOrder: Desc) { data { name price stock category { name } } meta { total } } }"}'
+
+curl -s localhost:8080/api/graphql -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN" \
+  -d '{"query":"{ me { email } myOrders { data { orderNumber status total } } }"}'
+```
+
+- **Errors** keep the REST status in GraphQL's shape: `extensions.code` (`BAD_REQUEST`, `UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `TOO_MANY_REQUESTS`, …), `extensions.status` and every validation message in `extensions.details`.
+- **Enums** use their GraphQL names: `sortBy: Price`, `sortOrder: Desc`, `status: Shipped`.
+- Money is a decimal string (`"12.50"`) like in REST; ids are `Int`; dates are ISO strings.
+- The guards (JWT, roles, rate limiting) and the error filter handle GraphQL operations the same way as REST calls, so a query can't be used to get around them.
+- Introspection is off in production, and there is no built-in browser IDE (it would need the strict Content-Security-Policy relaxed): use Postman, Insomnia or any GraphQL client against the endpoint.
+
 ## Logs
 
 - **One line per request**: method, path, status, duration, the user id and a request id. The id is returned as `X-Request-Id`; a valid one sent by the caller is kept, and the admin service sends the id of the admin action that triggered its webhook, so one change can be followed through both services' logs.

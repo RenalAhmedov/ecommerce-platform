@@ -5,6 +5,7 @@ import { JwtModule } from '@nestjs/jwt';
 import type { EnvironmentVariables } from '../config/interfaces/environment-variables.interface.js';
 import { UsersModule } from '../users/users.module.js';
 import { AuthController } from './auth.controller.js';
+import { AuthResolver } from './auth.resolver.js';
 import { AuthService } from './auth.service.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 import { RolesGuard } from './guards/roles.guard.js';
@@ -30,6 +31,7 @@ import { RevokedTokenStore } from './revoked-token.store.js';
   controllers: [AuthController],
   providers: [
     AuthService,
+    AuthResolver,
     RevokedTokenStore,
     {
       provide: APP_GUARD,

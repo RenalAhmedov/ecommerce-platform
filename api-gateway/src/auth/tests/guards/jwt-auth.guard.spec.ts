@@ -19,7 +19,10 @@ describe('JwtAuthGuard', () => {
       getType: () => type,
       getHandler: () => undefined,
       getClass: () => undefined,
-      switchToHttp: () => ({ getRequest: () => request }),
+      switchToHttp: () => ({
+        getRequest: () => request,
+        getResponse: () => ({}),
+      }),
     }) as unknown as ExecutionContext;
 
   const payload = {
