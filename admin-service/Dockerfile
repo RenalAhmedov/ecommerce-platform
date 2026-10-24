@@ -2,7 +2,7 @@
 
 # FrankenPHP: a PHP application server that speaks HTTP itself, so Nginx simply
 # proxies to it. It replaces `php artisan serve`, which is for development only.
-FROM dunglas/frankenphp:1.12.7-php8.4-alpine AS base
+FROM dunglas/frankenphp:1.13.0-php8.4-alpine AS base
 
 COPY --from=composer:2.8 /usr/bin/composer /usr/local/bin/composer
 
