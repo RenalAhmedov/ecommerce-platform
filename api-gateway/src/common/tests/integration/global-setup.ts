@@ -41,6 +41,8 @@ export default async function setup(
     REDIS_PORT: String(redis.getPort()),
     REDIS_DB: '0',
     RATE_LIMIT_ENABLED: 'false',
+    // Overrides a developer's .env; the search suite starts its own Elasticsearch.
+    ELASTICSEARCH_URL: '',
     JWT_SECRET: 'integration-tests-only-secret-0123456789abcdef',
     INTERNAL_API_KEY: 'integration-tests-only-api-key-0123456789abcdef',
   };
