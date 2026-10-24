@@ -1,13 +1,17 @@
 {
   "info": {
-    "name": "E-commerce API Gateway",
-    "description": "Manual test suite for the Nest.js API gateway. Run the folders top to bottom (or the whole collection with the Runner).\n\nBefore you start:\n1. `docker compose up -d` (root) and `npm run start:dev` (api-gateway).\n2. Run \"1. Auth > Register admin\", then promote it once in SQL:\n   UPDATE users SET role = 'admin' WHERE email = 'admin@example.test';\n3. Mailpit (emails): http://localhost:8025  |  Swagger: http://localhost:3000/api/docs\n\nRate limits: register 3/min and login 5/min per IP. Running \"1. Auth\" twice within a minute will hit 429 - wait a minute.",
+    "name": "E-commerce Platform",
+    "description": "Manual test suite for the whole platform, through Nginx (http://localhost:8080). Run the folders top to bottom, or the whole collection with the Runner.\n\nBefore you start: run `./scripts/setup.sh` from the repository root once. It starts everything and loads the demo data; the admin used here is the seeded admin@example.com / password123, and the search examples use the seeded products.\n\nUseful pages: the admin panel http://localhost:8080, Swagger http://localhost:8080/api/docs, emails in Mailpit http://localhost:8025.\n\nRate limits: register 3/min and login 5/min per IP. Running \"1. Auth\" twice within a minute hits 429, so wait a minute.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     {
       "key": "baseUrl",
-      "value": "http://localhost:3000/api"
+      "value": "http://localhost:8080/api"
+    },
+    {
+      "key": "adminBaseUrl",
+      "value": "http://localhost:8080/admin/api"
     },
     {
       "key": "customerToken",
@@ -120,43 +124,6 @@
           }
         },
         {
-          "name": "Register admin (then promote with SQL)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('status 201 or 409', () => pm.expect([201, 409]).to.include(pm.response.code));"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "auth": {
-              "type": "noauth"
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Admin\",\n  \"email\": \"admin@example.test\",\n  \"password\": \"password123\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": "{{baseUrl}}/auth/register",
-            "description": "Registration always creates a customer. Promote once in SQL:\nUPDATE users SET role = 'admin' WHERE email = 'admin@example.test';"
-          }
-        },
-        {
           "name": "Login customer",
           "event": [
             {
@@ -240,7 +207,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('status 200', () => pm.response.to.have.status(200));",
-                  "pm.test('role is admin (run the SQL promotion if this fails)', () => pm.expect(pm.response.json().user.role).to.eql('admin'));",
+                  "pm.test('role is admin (run ./scripts/setup.sh to load the demo admin)', () => pm.expect(pm.response.json().user.role).to.eql('admin'));",
                   "pm.collectionVariables.set('adminToken', pm.response.json().accessToken);"
                 ]
               }
@@ -259,7 +226,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"admin@example.test\",\n  \"password\": \"password123\"\n}",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"password123\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1495,7 +1462,541 @@
       ]
     },
     {
-      "name": "7. Rate limiting (run last)",
+      "name": "7. Search (Elasticsearch)",
+      "item": [
+        {
+          "name": "Typo is forgiven: headphnes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/products?search=headphnes"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const names = pm.response.json().data.map((p) => p.name);",
+                  "pm.test('finds Wireless Headphones', () => pm.expect(names).to.include('Wireless Headphones'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Words in any order: kettle electric",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/products?search=kettle%20electric"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const names = pm.response.json().data.map((p) => p.name);",
+                  "pm.test('finds Electric Kettle', () => pm.expect(names).to.include('Electric Kettle'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "As you type: wireless headph",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/products?search=wireless%20headph"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const names = pm.response.json().data.map((p) => p.name);",
+                  "pm.test('finds Wireless Headphones', () => pm.expect(names).to.include('Wireless Headphones'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Best match first: lamp, sortBy=relevance",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/products?search=lamp&sortBy=relevance"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const names = pm.response.json().data.map((p) => p.name);",
+                  "pm.test('Desk Lamp first', () => pm.expect(names[0]).to.eql('Desk Lamp'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Health shows the search engine",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('elasticsearch is up', () => pm.expect(pm.response.json().checks.elasticsearch).to.eql('up'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8. GraphQL",
+      "item": [
+        {
+          "name": "Products: typo search, only the fields needed",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/graphql",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query ($search: String!) {\\n  products(search: $search, sortBy: Relevance, limit: 5) {\\n    data { id name price stock category { name } }\\n    meta { total }\\n  }\\n}\",\n  \"variables\": {\n    \"search\": \"headphnes\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('no errors', () => pm.expect(pm.response.json().errors).to.be.undefined);",
+                  "pm.test('finds Wireless Headphones', () => pm.expect(pm.response.json().data.products.data[0].name).to.eql('Wireless Headphones'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Product by id",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/graphql",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query ($id: Int!) {\\n  product(id: $id) { name price stock createdAt }\\n}\",\n  \"variables\": {\n    \"id\": {{productId}}\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('no errors', () => pm.expect(pm.response.json().errors).to.be.undefined);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Me and my orders (customer token)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/graphql",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"{\\n  me { email role }\\n  myOrders(limit: 5) {\\n    data { orderNumber status total }\\n    meta { total }\\n  }\\n}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('no errors', () => pm.expect(pm.response.json().errors).to.be.undefined);",
+                  "pm.test('it is the customer', () => pm.expect(pm.response.json().data.me.role).to.eql('Customer'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Error: me without a token -> UNAUTHENTICATED",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/graphql",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"{\\n  me { email }\\n}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('UNAUTHENTICATED', () => pm.expect(pm.response.json().errors[0].extensions.code).to.eql('UNAUTHENTICATED'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Error: validation -> BAD_REQUEST with every message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{baseUrl}}/graphql",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"{\\n  products(limit: 500, page: 0) { meta { total } }\\n}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('BAD_REQUEST', () => pm.expect(pm.response.json().errors[0].extensions.code).to.eql('BAD_REQUEST'));",
+                  "pm.test('both messages', () => pm.expect(pm.response.json().errors[0].extensions.details).to.have.length(2));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "9. Admin API (Laravel, same JWT)",
+      "item": [
+        {
+          "name": "Dashboard figures",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{adminBaseUrl}}/dashboard"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Products (Nest field names, paginated)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{adminBaseUrl}}/products?limit=5"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Nest-style page', () => pm.expect(pm.response.json().meta).to.have.keys('page', 'limit', 'total', 'totalPages'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Customer token -> 403",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{adminBaseUrl}}/products"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Move the order to processing (other admins see it live)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{adminBaseUrl}}/orders/{{orderId}}/status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"processing\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('processing', () => pm.expect(pm.response.json().data.status).to.eql('processing'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout here also logs out of the api-gateway",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{adminBaseUrl}}/auth/logout"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "The same token is now refused by the api-gateway",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/auth/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "10. Rate limiting (run last)",
       "item": [
         {
           "name": "Login - send this 6 times quickly",

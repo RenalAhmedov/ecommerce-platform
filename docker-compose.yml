@@ -76,9 +76,9 @@ services:
       api-gateway:
         condition: service_healthy
       admin-service:
-        condition: service_started
+        condition: service_healthy
       reverb:
-        condition: service_started
+        condition: service_healthy
 
   # Runs the Nest migrations once and exits. Nest owns the shared schema, so
   # both apps (and the admin service's own migrations) wait for it to succeed.
@@ -136,13 +136,14 @@ services:
         condition: service_healthy
 
   # The admin service's own tables (password resets, failed jobs, imports). Runs
-  # after Nest's migrations and installs the PHP packages first when needed.
+  # after Nest's migrations; first installs the PHP packages when needed and links
+  # public/storage (product pictures), which git doesn't keep.
   admin-migrate:
     build:
       context: ./admin-service
       target: dev
     image: ecommerce-platform-admin-service
-    command: ["sh", "-c", "composer install --no-interaction --no-progress --quiet && php artisan migrate --force"]
+    command: ["sh", "-c", "composer install --no-interaction --no-progress --quiet && php artisan storage:link --quiet && php artisan migrate --force"]
     volumes:
       - ./admin-service:/var/www/html
     depends_on:
@@ -161,6 +162,12 @@ services:
       - "127.0.0.1:${ADMIN_PORT:-8000}:8000"
     environment:
       NEST_API_URL: http://api-gateway:3000
+    # Replaces the base image's check, which probes a FrankenPHP port only the web server has.
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:8000/up"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
     depends_on:
       admin-migrate:
         condition: service_completed_successfully
@@ -183,12 +190,16 @@ services:
     <<: *admin-service
     command: ["php", "artisan", "orders:listen"]
     ports: []
+    healthcheck:
+      disable: true
 
   # Development: queue:listen reloads the code for every job. Production uses queue:work.
   admin-worker:
     <<: *admin-service
     command: ["php", "artisan", "queue:listen", "--tries=3", "--timeout=60"]
     ports: []
+    healthcheck:
+      disable: true
 
   # Test runner only, never started by `up`:
   #   docker compose run --rm api-tests                      (unit + integration tests)

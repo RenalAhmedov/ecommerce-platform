@@ -16,15 +16,7 @@ docker compose up -d          # the whole platform: databases, both apps, worker
 
 The panel is served through Nginx at **http://localhost:8080** (`HTTP_PORT` in the root `.env`), the same address as the Nest API (`/api`). The container is also reachable directly at http://localhost:8000 (`ADMIN_PORT`) for debugging; `APP_URL` must be the Nginx address, since product image links and emailed links are built from it.
 
-First time only (creates `.env` and the encryption key):
-
-```bash
-cp admin-service/.env.example admin-service/.env
-docker compose run --rm --no-deps admin-service composer install
-docker compose run --rm --no-deps admin-service php artisan key:generate
-docker compose up -d
-docker compose exec admin-service php artisan storage:link   # serves storage/app/public at /storage
-```
+First time: run [`scripts/setup.sh`](../scripts/setup.sh) from the repository root. It creates `.env` with a fresh `APP_KEY`, Reverb credentials and the secrets shared with the api-gateway, builds the CSS/JS, starts everything and loads the [demo data](#demo-data). After that, `admin-migrate` keeps the PHP packages, the `public/storage` link (product pictures) and the migrations up to date on every start.
 
 Build the CSS/JS (Tailwind + Alpine via Vite) the first time and whenever `resources/css`, `resources/js` or the Blade views change. Node 24 runs in a container, so nothing needs to be installed:
 

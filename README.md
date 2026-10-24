@@ -1,124 +1,146 @@
 # E-commerce Platform
 
-Hybrid e-commerce platform: a Laravel admin panel and a Nest.js API gateway sharing one PostgreSQL database.
+[![CI/CD](https://github.com/RenalAhmedov/ecommerce-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/RenalAhmedov/ecommerce-platform/actions/workflows/ci.yml)
 
-```
-ecommerce-platform/
-├── admin-service/       # Laravel (admin panel), coming soon
-├── api-gateway/         # Nest.js (API gateway + core API)
-├── database/schema/     # Reference SQL schema, one file per table
-└── docker-compose.yml   # PostgreSQL, Redis, Mailpit
-```
+A hybrid e-commerce backend: a **Nest.js API gateway** for the shop (customers, catalogue, checkout) and a **Laravel admin panel** for the people running it, sharing one PostgreSQL database, one Redis and one login.
 
-## Prerequisites
+| | api-gateway (Nest.js 12, Node 24) | admin-service (Laravel 13, PHP 8.4) |
+|---|---|---|
+| For | customers and shop frontends | admins |
+| Offers | REST API with Swagger, read-only GraphQL, JWT auth | Blade panel, JSON admin API |
+| Highlights | product catalogue with Redis cache and Elasticsearch search (typo-tolerant, relevance), checkout with stock reservation, mock payment and idempotency keys, confirmation emails on a queue, rate limiting, token revocation | product CRUD with image processing and CSV import/export, nested categories, order management, dashboard, sales reports (CSV/PDF), user management, live order notifications over WebSockets, shop search preview |
 
-| Tool | Version | Check with |
-|------|---------|------------|
-| [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or Docker Engine + Compose v2) | Compose **v2** | `docker compose version` |
-| [Node.js](https://nodejs.org/) | **24** or newer | `node -v` |
-| Git | any | `git --version` |
+Everything runs in Docker. Nothing else needs to be installed.
 
-If you use [nvm](https://github.com/nvm-sh/nvm), run `nvm install` inside `api-gateway/` and it picks up the right version from `.nvmrc`.
+## Quick start
 
-Docker runs the infrastructure (database, cache, mail). The Nest.js app runs directly on your machine with Node.
-
-## Getting started
-
-### 1. Start the infrastructure
-
-Make sure Docker Desktop is running, then from the repository root:
+Requirements: [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or Docker Engine with Compose v2), about 4 GB of memory for Docker, and a POSIX shell (macOS, Linux, or WSL on Windows).
 
 ```bash
-docker compose up -d
-docker compose ps        # all three services should be "running" / "healthy"
+git clone https://github.com/RenalAhmedov/ecommerce-platform.git
+cd ecommerce-platform
+./scripts/setup.sh
 ```
 
-This starts:
+[`scripts/setup.sh`](scripts/setup.sh) creates the three `.env` files with freshly generated secrets (the ones both services must share are made to match), builds the panel's CSS/JS, starts the whole platform, waits until it is healthy and loads the demo data. The first run takes a few minutes; running it again changes nothing that already exists.
 
-| Service | Address | Login | Used for |
-|---------|---------|-------|----------|
-| PostgreSQL 16 | `localhost:5432` | database `ecommerce`, user `ecommerce`, password `secret` | Main database |
-| Redis 7 | `localhost:6379` | none | Caching and job queues |
-| Mailpit | SMTP `localhost:1025`, inbox http://localhost:8025 | none | Catches every email the app sends, so nothing is really delivered |
+| What | Where | Login |
+|---|---|---|
+| Admin panel | http://localhost:8080 | `admin@example.com` / `password123` |
+| REST API + Swagger | http://localhost:8080/api/docs | customers: `ada.lovelace@example.com` (and 7 more) / `password123` |
+| GraphQL | `POST http://localhost:8080/api/graphql` | same tokens as REST |
+| Admin JSON API | http://localhost:8080/admin/api | an admin's access token |
+| Emails (Mailpit) | http://localhost:8025 | |
 
-All ports are bound to `127.0.0.1`, so they are only reachable from your own machine. The credentials are local development defaults.
+The demo data: 1 admin, 8 customers, a category tree, 20 products with pictures and stock (some low, one sold out, one inactive) and 24 orders over the last 30 days in every status.
 
-### 2. Configure the API
+Day to day: `docker compose up -d` / `docker compose stop`; `docker compose logs -f api-gateway` (or any service); `docker compose down -v` wipes all data.
+
+### Try it
 
 ```bash
-cd api-gateway
-cp .env.example .env
+# log in as a customer and keep the token
+TOKEN=$(curl -s -X POST localhost:8080/api/auth/login -H 'Content-Type: application/json' \
+  -d '{"email":"ada.lovelace@example.com","password":"password123"}' | sed -E 's/.*"accessToken":"([^"]+)".*/\1/')
+
+# search with a typo (Elasticsearch)
+curl -s 'localhost:8080/api/products?search=headphnes&sortBy=relevance'
+
+# the same through GraphQL, asking only for the fields needed
+curl -s localhost:8080/api/graphql -H 'Content-Type: application/json' \
+  -d '{"query":"{ products(search: \"headphnes\") { data { name price stock } } }"}'
+
+# your orders
+curl -s localhost:8080/api/orders -H "Authorization: Bearer $TOKEN"
 ```
 
-Open `.env` and set `JWT_SECRET` to a random string of at least 32 characters. To generate one:
+A [Postman collection](postman/ecommerce-api.postman_collection.json) walks through everything (auth, products, checkout including idempotency and stock conflicts, token revocation, search, GraphQL, the admin API, rate limiting), with a check on every response.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    browser([Browser / API client]) --> nginx[Nginx :8080]
+
+    nginx -- "/api" --> api[api-gateway<br/>Nest.js]
+    nginx -- "everything else" --> admin[admin-service<br/>Laravel + FrankenPHP]
+    nginx -- "/app (WebSocket)" --> reverb[Reverb]
+
+    api --> pg[(PostgreSQL)]
+    admin --> pg
+    api --> redis[(Redis)]
+    admin --> redis
+    api --> es[(Elasticsearch)]
+
+    admin -- "catalogue webhook<br/>(API key, queued)" --> api
+    admin -- "shop search preview<br/>(GraphQL)" --> api
+    api -. "order.paid<br/>(Redis pub/sub)" .-> events[admin-events]
+    events --> worker[admin-worker] --> reverb
+    reverb -. "live toasts" .-> browser
+```
+
+| Container | Role |
+|---|---|
+| `nginx` | single entry point: `/api` → Nest, `/app` → Reverb, the rest → Laravel; request ids, real client IPs |
+| `api-gateway`, `api-migrate` | the Nest app; its migrations (it owns the shared schema) run once before anything starts |
+| `admin-service`, `admin-migrate` | the Laravel app served by FrankenPHP; its own few tables |
+| `admin-worker` | Laravel queue: image processing, imports, webhooks, broadcasts |
+| `admin-events` | turns Nest's `order.paid` events into live notifications |
+| `reverb` | WebSocket server for the panel |
+| `postgres`, `redis`, `elasticsearch`, `mailpit` | data, cache/queues/sessions, product search, caught emails |
+
+### How the two services work together
+
+- **One database, one owner.** Both services read and write the same tables; Nest owns the schema (TypeORM migrations), and Laravel keeps a copy of the definitions for its tests plus its own history table. The same uniqueness rules are enforced on both sides with the same PostgreSQL advisory-lock keys (e.g. `products.sku:<SKU>`), so a shop sign-up and an admin can't create the same email at the same moment.
+- **One login.** Nest issues the JWTs; Laravel verifies the same tokens for its admin API, and an admin can open the panel with a Nest token (a shared session that ends when either side logs out). Logouts, deleted users, demotions and password changes revoke tokens in both services through shared Redis keys.
+- **Catalogue changes** made in the panel reach Nest through an API-key webhook, sent from Laravel's queue with retries and de-duplicated by event id; Nest drops its cached product responses and re-syncs its search index.
+- **Live updates.** Paid orders (from Nest) and status changes (from other admins) appear in every open panel within a second, through Reverb and Echo.
+- **Traceability.** Nginx gives every request an id that travels into both services' logs and across the webhook and GraphQL calls between them.
+
+## Testing
+
+Only Docker is needed:
 
 ```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+docker compose run --rm api-tests      # Nest: 286 unit + 42 integration tests
+docker compose run --rm admin-tests    # Laravel: 282 unit + integration tests
 ```
 
-The other values in `.env` already match `docker-compose.yml`.
+Unit tests mock every collaborator. Integration tests run the real application over HTTP against real PostgreSQL, Redis and Elasticsearch, started as throwaway containers with [Testcontainers](https://testcontainers.com/) for each run, so the development data is never touched. They include the hard cases: concurrent registrations and orders racing for the last items, idempotent retries, cache invalidation, a search index catching up with changes made straight in the database, and falling back to Postgres when Elasticsearch stops.
 
-### 3. Install, migrate, run
+## CI/CD
 
-```bash
-npm ci                   # install exact dependency versions from package-lock.json
-npm run migration:run    # create the database tables
-npm run start:dev        # start the API on http://localhost:3000 (restarts on file changes)
+[GitHub Actions](.github/workflows/ci.yml) on every pull request and push to `main`: formatting, lint, typecheck and all tests of both services, the frontend build and a check of the compose and Nginx configuration. On `main`, once everything passes, both production images are built and pushed to GitHub's container registry (`ghcr.io/renalahmedov/ecommerce-platform-api-gateway` and `…-admin-service`). Actions are pinned to commit SHAs; Dependabot proposes updates weekly.
+
+## Production
+
+`docker compose -f docker-compose.prod.yml up -d --build` runs the production-like stack on http://localhost:8090, with its own data: images with the code baked in (multi-stage builds, unprivileged users, health checks), production PHP and Node settings, `queue:work`, no Swagger or GraphQL introspection, only Nginx published. Secrets come from the services' `.env` files.
+
+## Design decisions
+
+- **Shared database instead of service-to-service calls for data.** The admin panel works on the same rows the shop does, so nothing has to be copied or kept in sync, and a report is a query rather than a distributed join. The price is coupling on the schema, which is why one service owns it and both enforce the same rules with the same locks.
+- **Correctness under concurrency.** Stock is reserved under row locks taken in a fixed order (no deadlocks, no overselling), order totals are computed from database prices in cents, checkout accepts an `Idempotency-Key`, and uniqueness checks run under advisory locks. Each of these has an integration test that races real requests.
+- **Degrade, don't fail.** Redis being down disables caching and rate limiting but not the shop; Elasticsearch being down falls back to Postgres search; a missed webhook is caught up by a scheduled sync. The exceptions fail closed on purpose: logging out and revoking a deleted user's tokens refuse to report success while Redis can't record them.
+- **Elasticsearch finds, Postgres answers.** The index holds only what is searched; prices and stock always come from the database. For a small catalogue Postgres alone would do; Elasticsearch earns its place with typo tolerance, relevance and large catalogues.
+- **Queues for anything slow or retryable**: emails, image processing, imports, webhooks, broadcasts.
+- **Layering in both services**: controllers stay thin, services hold the rules, repositories are the only code that talks to a data store.
+
+## Repository layout
+
 ```
-
-### 4. Try it
-
-```bash
-# register a customer
-curl -s -X POST localhost:3000/api/auth/register -H 'content-type: application/json' \
-  -d '{"name":"Demo","email":"demo@example.com","password":"password123"}'
-
-# log in and keep the token
-TOKEN=$(curl -s -X POST localhost:3000/api/auth/login -H 'content-type: application/json' \
-  -d '{"email":"demo@example.com","password":"password123"}' \
-  | node -pe 'JSON.parse(require("fs").readFileSync(0)).accessToken')
-
-# call a protected endpoint
-curl -s localhost:3000/api/auth/me -H "Authorization: Bearer $TOKEN"
+├── api-gateway/          Nest.js API gateway          → api-gateway/README.md
+├── admin-service/        Laravel admin panel          → admin-service/README.md
+├── nginx/                reverse proxy config
+├── database/schema/      reference SQL, one file per table
+├── postman/              API walkthrough collection
+├── scripts/setup.sh      first start of a fresh clone
+├── docker-compose.yml    development stack (+ test runners)
+└── docker-compose.prod.yml
 ```
-
-## Day-to-day commands
-
-| What | Command (from the repository root) |
-|------|---------|
-| Stop the services, keep the data | `docker compose stop` |
-| Start them again | `docker compose up -d` |
-| Wipe the database and Redis completely | `docker compose down -v`, then rerun `npm run migration:run` |
-| Open a SQL shell | `docker compose exec postgres psql -U ecommerce -d ecommerce` |
-| See service logs | `docker compose logs -f postgres` |
-
-More API commands (tests, migrations) are in [api-gateway/README.md](api-gateway/README.md).
 
 ## Troubleshooting
 
-**`Cannot connect to the Docker daemon`**
-Docker Desktop isn't running. Start it and wait until it says it's running.
-
-**`Bind for 127.0.0.1:5432 failed: port is already allocated`** (or 6379, 1025, 8025)
-Something on your machine already uses that port, usually a locally installed PostgreSQL or Redis. Either stop it, or pick another port: create a `.env` file in the **repository root** containing e.g. `DB_PORT=5433`, and set the **same** `DB_PORT=5433` in `api-gateway/.env`. The two must match. The other ports can be changed the same way with `REDIS_PORT`, `MAIL_SMTP_PORT` and `MAIL_UI_PORT` (see the root `.env.example`).
-
-**`docker-compose: command not found`, or errors about the `name` field**
-You have the old Compose v1. Use `docker compose` (with a space), which comes with Docker Desktop.
-
-**`Config validation error: "JWT_SECRET" is not allowed to be empty`** (or `length must be at least 32 characters long`)
-Set `JWT_SECRET` in `api-gateway/.env` as described in step 2.
-
-**`npm warn EBADENGINE Unsupported engine`, `ReferenceError: crypto is not defined`, `ERR_REQUIRE_ESM`, or `The "path" argument must be of type string. Received undefined`**
-Your Node.js is too old (these are what Node 18–22 print). Install Node 24 with `nvm install` inside `api-gateway/`, then reinstall: `rm -rf node_modules && npm ci`.
-
-**`relation "users" does not exist`**
-The tables haven't been created yet. Run `npm run migration:run` in `api-gateway/`.
-
-**`ECONNREFUSED 127.0.0.1:5432` when starting the API**
-PostgreSQL isn't running. Run `docker compose up -d` from the repository root.
-
-**`EADDRINUSE: address already in use :::3000`**
-Another app (or another copy of this one) already uses port 3000. Stop it, or set `PORT=3001` in `api-gateway/.env`.
-
-**`npm ci` fails with `E401` / `Unable to authenticate`**
-Your global npm config points at a private registry. `api-gateway/.npmrc` already forces the public npm registry for this project, so make sure you run `npm ci` **inside** `api-gateway/`.
+- **`Cannot connect to the Docker daemon`**: start Docker Desktop and wait until it is running.
+- **`port is already allocated`**: something else uses that port. Every published port can be changed in the root `.env` (`HTTP_PORT`, `DB_PORT`, `REDIS_PORT`, …, see [`.env.example`](.env.example)).
+- **Elasticsearch keeps restarting or the stack is slow**: give Docker more memory (Docker Desktop → Settings → Resources; about 4 GB).
+- **`/api/health` says `degraded`** right after starting: Elasticsearch takes about half a minute; search uses Postgres until then.
