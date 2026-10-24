@@ -9,8 +9,10 @@ Everything runs in Docker: you do not need PHP or Composer installed locally.
 From the repository root:
 
 ```bash
-docker compose up -d          # starts postgres, redis, mailpit, admin-service and admin-worker
+docker compose up -d          # the whole platform: databases, both apps, worker, Nginx
 ```
+
+`admin-migrate` runs once before the app starts: it installs the PHP packages when needed and applies this service's migrations (after Nest's `api-migrate`, since Nest owns the shared tables). The app is served by [FrankenPHP](https://frankenphp.dev), a PHP application server that speaks HTTP, so Nginx simply proxies to it; in development each request runs fresh, so code changes apply at once.
 
 The panel is served through Nginx at **http://localhost:8080** (`HTTP_PORT` in the root `.env`), the same address as the Nest API (`/api`). The container is also reachable directly at http://localhost:8000 (`ADMIN_PORT`) for debugging; `APP_URL` must be the Nginx address, since product image links and emailed links are built from it.
 
@@ -20,7 +22,7 @@ First time only (creates `.env` and the encryption key):
 cp admin-service/.env.example admin-service/.env
 docker compose run --rm --no-deps admin-service composer install
 docker compose run --rm --no-deps admin-service php artisan key:generate
-docker compose up -d admin-service
+docker compose up -d
 docker compose exec admin-service php artisan storage:link   # serves storage/app/public at /storage
 ```
 
@@ -206,7 +208,7 @@ Sessions, cache and queues use the shared Redis. Every Laravel key starts with `
 
 The cache lives in its own Redis database because `php artisan cache:clear` runs `FLUSHDB` on it: in database 0 it would also wipe the Nest queues and idempotency keys, and log every admin out.
 
-Queued jobs are run by the `admin-worker` container (`php artisan queue:listen`, which reloads code for every job so edits apply without a restart). A job is tried 3 times; after that it is stored in the Postgres `failed_jobs` table:
+Queued jobs are run by the `admin-worker` container (`php artisan queue:listen` in development, which reloads code for every job so edits apply without a restart; `queue:work` in production, which keeps the app booted and restarts hourly). A job is tried 3 times; after that it is stored in the Postgres `failed_jobs` table:
 
 ```bash
 docker compose logs -f admin-worker

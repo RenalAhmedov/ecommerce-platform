@@ -1,0 +1,155 @@
+# Production-like stack: images with the code baked in, no source mounts, only
+# Nginx published. Its own project name keeps its database and Redis apart from
+# the development stack, and its own port lets both run side by side:
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#   open http://localhost:8090
+#
+# Secrets (JWT_SECRET, INTERNAL_API_KEY, APP_KEY) come from the services' .env
+# files; everything that differs from development is set below and wins over them.
+name: ecommerce-platform-prod
+
+x-api-gateway: &api-gateway
+  build:
+    context: ./api-gateway
+    target: prod
+  image: ecommerce-platform-api-gateway:prod
+  env_file: ./api-gateway/.env
+  environment:
+    NODE_ENV: production
+    DB_HOST: postgres
+    DB_PORT: 5432
+    DB_DATABASE: ${DB_DATABASE:-ecommerce}
+    DB_USERNAME: ${DB_USERNAME:-ecommerce}
+    DB_PASSWORD: ${DB_PASSWORD:-secret}
+    REDIS_HOST: redis
+    REDIS_PORT: 6379
+    MAIL_HOST: mailpit
+    MAIL_PORT: 1025
+
+x-admin-service: &admin-service
+  build:
+    context: ./admin-service
+    target: prod
+  image: ecommerce-platform-admin-service:prod
+  env_file: ./admin-service/.env
+  environment:
+    APP_ENV: production
+    APP_DEBUG: "false"
+    APP_URL: http://localhost:${PROD_HTTP_PORT:-8090}
+    LOG_LEVEL: info
+    DB_HOST: postgres
+    DB_PORT: 5432
+    DB_DATABASE: ${DB_DATABASE:-ecommerce}
+    DB_USERNAME: ${DB_USERNAME:-ecommerce}
+    DB_PASSWORD: ${DB_PASSWORD:-secret}
+    REDIS_HOST: redis
+    MAIL_HOST: mailpit
+    NEST_API_URL: http://api-gateway:3000
+  # Uploaded images and imports: written by the web container, processed by the worker.
+  volumes:
+    - admin-storage:/var/www/html/storage/app
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-ecommerce}
+      POSTGRES_USER: ${DB_USERNAME:-ecommerce}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Stands in for a real SMTP server; point MAIL_HOST at one in a real deployment.
+  mailpit:
+    image: axllent/mailpit:v1.20
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${PROD_MAIL_UI_PORT:-8035}:8025"
+
+  api-migrate:
+    <<: *api-gateway
+    command: ["npm", "run", "typeorm", "--", "migration:run"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api-gateway:
+    <<: *api-gateway
+    restart: unless-stopped
+    depends_on:
+      api-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  admin-migrate:
+    <<: *admin-service
+    command: ["php", "artisan", "migrate", "--force"]
+    depends_on:
+      api-migrate:
+        condition: service_completed_successfully
+
+  admin-service:
+    <<: *admin-service
+    restart: unless-stopped
+    depends_on:
+      admin-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  # queue:work keeps the booted app in memory (fast); --max-time restarts it hourly
+  # so memory never creeps up, and `restart` brings it straight back.
+  admin-worker:
+    <<: *admin-service
+    restart: unless-stopped
+    command: ["php", "artisan", "queue:work", "--tries=3", "--timeout=60", "--max-time=3600"]
+    healthcheck:
+      disable: true
+    depends_on:
+      admin-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:1.28-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${PROD_HTTP_PORT:-8090}:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1/nginx-health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+      admin-service:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  redis-data:
+  admin-storage:

@@ -1,7 +1,17 @@
 vendor
 node_modules
 .env
+.env.*
+!.env.example
+public/build
+public/storage
 storage/logs/*
 storage/framework/cache/*
 storage/framework/sessions/*
 storage/framework/views/*
+storage/app/public/*
+storage/app/private/*
+bootstrap/cache/*.php
+tests
+phpunit.xml
+.phpunit.result.cache

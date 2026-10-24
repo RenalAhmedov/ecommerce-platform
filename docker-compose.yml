@@ -108,8 +108,24 @@ services:
       redis:
         condition: service_healthy
 
+  # The admin service's own tables (password resets, failed jobs, imports). Runs
+  # after Nest's migrations and installs the PHP packages first when needed.
+  admin-migrate:
+    build:
+      context: ./admin-service
+      target: dev
+    image: ecommerce-platform-admin-service
+    command: ["sh", "-c", "composer install --no-interaction --no-progress --quiet && php artisan migrate --force"]
+    volumes:
+      - ./admin-service:/var/www/html
+    depends_on:
+      api-migrate:
+        condition: service_completed_successfully
+
   admin-service: &admin-service
-    build: ./admin-service
+    build:
+      context: ./admin-service
+      target: dev
     image: ecommerce-platform-admin-service
     restart: unless-stopped
     volumes:
@@ -119,13 +135,12 @@ services:
     environment:
       NEST_API_URL: http://api-gateway:3000
     depends_on:
-      api-migrate:
+      admin-migrate:
         condition: service_completed_successfully
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
 
+  # Development: queue:listen reloads the code for every job. Production uses queue:work.
   admin-worker:
     <<: *admin-service
     command: ["php", "artisan", "queue:listen", "--tries=3", "--timeout=60"]
@@ -139,7 +154,9 @@ services:
   # are reached through the host; the app containers above get no socket access.
   admin-tests:
     image: ecommerce-platform-admin-service
-    build: ./admin-service
+    build:
+      context: ./admin-service
+      target: dev
     profiles: ["test"]
     entrypoint: ["sh", "-c", "[ -f .env ] || cp .env.example .env; composer install --no-interaction --no-progress --quiet && exec php artisan test \"$$@\"", "--"]
     command: []
