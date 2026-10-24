@@ -1,0 +1,25 @@
+# Weekly pull requests for outdated dependencies; each one runs CI before it can be merged.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directories: [/api-gateway, /admin-service]
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: composer
+    directory: /admin-service
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: docker
+    directories: [/api-gateway, /admin-service]
+    schedule:
+      interval: weekly

@@ -13,7 +13,7 @@ docker compose up -d          # api-migrate runs the migrations, then api-gatewa
 docker compose logs -f api-gateway
 ```
 
-`api-migrate` is a one-shot service: it applies pending migrations and exits, and both apps wait for it to succeed (this service owns the shared schema). Code changes reload automatically. After changing `package.json`, rebuild with `docker compose build api-gateway` and recreate the `node_modules` volume (`docker compose down` then `docker volume rm ecommerce-platform_api-gateway-node-modules`).
+`api-migrate` is a one-shot service: it applies pending migrations and exits, and both apps wait for it to succeed (this service owns the shared schema). Code changes reload automatically. After a dependency change (`package-lock.json`), the containers reinstall `node_modules` by themselves on their next start.
 
 Without Docker for the app itself: `npm run start:dev` (stop the `api-gateway` container first, it uses port 3000).
 
@@ -116,10 +116,22 @@ npm run format    # prettier
 
 ## Test
 
+With only Docker, from the repository root (nothing else installed):
+
+```bash
+docker compose run --rm api-tests                     # unit + integration tests
+docker compose run --rm api-tests npm test            # unit tests only
+docker compose run --rm api-tests npm run lint        # any npm script
+```
+
+Or with Node 24 on your machine, from `api-gateway/`:
+
 ```bash
 npm test                  # unit tests (no Docker needed)
 npm run test:cov          # unit test coverage
 npm run test:integration  # integration tests (needs Docker running)
 ```
 
-Integration tests use [Testcontainers](https://testcontainers.com/): each run starts its own throwaway `postgres:16-alpine` and `redis:7-alpine` containers (the same images as `docker-compose.yml`), runs the migrations, boots the real app over HTTP with the real Redis event listener, and removes the containers afterwards. Your `docker compose` services and dev data are never touched, and the compose stack does not need to be running. Only outgoing email is faked. Tables and Redis are wiped before every test.
+Integration tests use [Testcontainers](https://testcontainers.com/): each run starts its own throwaway `postgres:16-alpine` and `redis:7-alpine` containers (the same images as `docker-compose.yml`), runs the migrations, boots the real app over HTTP with the real Redis event listener, and removes the containers afterwards; the search suite also starts its own Elasticsearch (the others run with search off). Your `docker compose` services and dev data are never touched, and the compose stack does not need to be running. Only outgoing email is faked. Tables and Redis are wiped before every test.
+
+In Docker, `node_modules` is a volume shared by the development containers (`api-gateway`, `api-migrate`, `api-tests`). [`docker/install-dependencies.sh`](docker/install-dependencies.sh) reinstalls it only when `package-lock.json` changed since the last install, so a fresh clone and a pulled dependency change both just work.
