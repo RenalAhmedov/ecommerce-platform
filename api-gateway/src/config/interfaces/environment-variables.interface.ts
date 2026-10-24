@@ -14,6 +14,7 @@ export interface EnvironmentVariables {
   REDIS_PORT: number;
   REDIS_DB: number;
   CACHE_TTL_SECONDS: number;
+  ELASTICSEARCH_URL: string;
   MAIL_HOST: string;
   MAIL_PORT: number;
   MAIL_FROM: string;

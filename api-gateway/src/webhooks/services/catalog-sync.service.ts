@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ProductsCache } from '../../products/products.cache.js';
+import { ProductChangeNotifier } from '../../products/product-change.notifier.js';
 import type { CatalogWebhookDto } from '../dto/catalog-webhook.dto.js';
 import { WebhookEventStore } from '../webhook-event.store.js';
 
@@ -8,14 +8,15 @@ export type CatalogSyncResult = 'processed' | 'duplicate';
 /**
  * Keeps this service in step with catalogue changes made in the admin
  * service. Both share one database, so there is no data to copy: the cached
- * product responses are invalidated so the next read sees the change at once.
+ * product responses are invalidated so the next read sees the change at once,
+ * and the search index catches up with the changed products.
  */
 @Injectable()
 export class CatalogSyncService {
   private readonly logger = new Logger(CatalogSyncService.name);
 
   constructor(
-    private readonly productsCache: ProductsCache,
+    private readonly productChangeNotifier: ProductChangeNotifier,
     private readonly webhookEvents: WebhookEventStore,
   ) {}
 
@@ -27,9 +28,9 @@ export class CatalogSyncService {
       return 'duplicate';
     }
 
-    await this.productsCache.invalidate();
+    await this.productChangeNotifier.productsChanged();
     this.logger.log(
-      `Product cache invalidated by ${event.type} event ${event.eventId} (occurred ${event.occurredAt})`,
+      `Product cache invalidated and search sync requested by ${event.type} event ${event.eventId} (occurred ${event.occurredAt})`,
     );
 
     return 'processed';

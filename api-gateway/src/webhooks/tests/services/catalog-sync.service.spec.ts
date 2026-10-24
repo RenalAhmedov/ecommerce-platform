@@ -1,11 +1,11 @@
-import type { ProductsCache } from '../../../products/products.cache.js';
+import type { ProductChangeNotifier } from '../../../products/product-change.notifier.js';
 import type { CatalogWebhookDto } from '../../dto/catalog-webhook.dto.js';
 import { CatalogEventType } from '../../enums/catalog-event-type.enum.js';
 import { CatalogSyncService } from '../../services/catalog-sync.service.js';
 import type { WebhookEventStore } from '../../webhook-event.store.js';
 
 describe('CatalogSyncService', () => {
-  let productsCache: { invalidate: ReturnType<typeof vi.fn> };
+  let notifier: { productsChanged: ReturnType<typeof vi.fn> };
   let webhookEvents: { markIfNew: ReturnType<typeof vi.fn> };
   let service: CatalogSyncService;
 
@@ -16,19 +16,19 @@ describe('CatalogSyncService', () => {
   };
 
   beforeEach(() => {
-    productsCache = { invalidate: vi.fn().mockResolvedValue(undefined) };
+    notifier = { productsChanged: vi.fn().mockResolvedValue(undefined) };
     webhookEvents = { markIfNew: vi.fn().mockResolvedValue(true) };
     service = new CatalogSyncService(
-      productsCache as unknown as ProductsCache,
+      notifier as unknown as ProductChangeNotifier,
       webhookEvents as unknown as WebhookEventStore,
     );
   });
 
-  it('invalidates the product cache for a new event', async () => {
+  it('refreshes the product cache and search index for a new event', async () => {
     await expect(service.handle(event)).resolves.toBe('processed');
 
     expect(webhookEvents.markIfNew).toHaveBeenCalledWith(event.eventId);
-    expect(productsCache.invalidate).toHaveBeenCalledTimes(1);
+    expect(notifier.productsChanged).toHaveBeenCalledTimes(1);
   });
 
   it('does nothing for a redelivered event', async () => {
@@ -36,6 +36,6 @@ describe('CatalogSyncService', () => {
 
     await expect(service.handle(event)).resolves.toBe('duplicate');
 
-    expect(productsCache.invalidate).not.toHaveBeenCalled();
+    expect(notifier.productsChanged).not.toHaveBeenCalled();
   });
 });

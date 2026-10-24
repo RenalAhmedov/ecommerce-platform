@@ -26,6 +26,7 @@ x-api-gateway: &api-gateway
     REDIS_PORT: 6379
     MAIL_HOST: mailpit
     MAIL_PORT: 1025
+    ELASTICSEARCH_URL: http://elasticsearch:9200
 
 x-admin-service: &admin-service
   build:
@@ -77,6 +78,24 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  # Product search. Optional: without it (or while it is down) the api-gateway
+  # searches Postgres instead. Security is off because only this Docker network
+  # (and, in development, 127.0.0.1) can reach it; a public deployment turns it on.
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.5.3
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=2s' >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
 
   # Stands in for a real SMTP server; point MAIL_HOST at one in a real deployment.
   mailpit:
@@ -179,4 +198,5 @@ services:
 volumes:
   postgres-data:
   redis-data:
+  elasticsearch-data:
   admin-storage:

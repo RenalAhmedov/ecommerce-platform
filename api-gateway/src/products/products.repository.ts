@@ -9,6 +9,7 @@ import { PRODUCT_COLUMNS } from './constants/product-query.constants.js';
 import type { ProductQueryDto } from './dto/product-query.dto.js';
 import { Product } from './entities/product.entity.js';
 import { ProductListQuery } from './queries/product-list.query.js';
+import type { IndexableProduct } from './search/product-search-document.js';
 import type {
   NewProduct,
   ProductChanges,
@@ -89,6 +90,45 @@ export class ProductsRepository {
 
   existsBySlug(slug: string, excludeId?: number): Promise<boolean> {
     return this.existsByColumn('slug', slug, excludeId);
+  }
+
+  /** Ids of products created, changed or deleted after `since` (all of them when null), deleted ones included. */
+  async findIdsChangedSince(since: Date | null): Promise<number[]> {
+    const changedQuery = this.repository
+      .createQueryBuilder('product')
+      .withDeleted()
+      .select('product.id', 'id')
+      .orderBy('product.id', 'ASC');
+
+    if (since) {
+      changedQuery.where(
+        '(product.updatedAt > :since OR product.deletedAt > :since)',
+        { since },
+      );
+    }
+
+    const rows = await changedQuery.getRawMany<{ id: number }>();
+
+    return rows.map((row) => Number(row.id));
+  }
+
+  findIndexableByIds(ids: number[]): Promise<IndexableProduct[]> {
+    return this.repository
+      .createQueryBuilder('product')
+      .withDeleted()
+      .select([
+        'product.id',
+        'product.name',
+        'product.sku',
+        'product.description',
+        'product.categoryId',
+        'product.price',
+        'product.isActive',
+        'product.createdAt',
+        'product.deletedAt',
+      ])
+      .where('product.id IN (:...ids)', { ids })
+      .getMany();
   }
 
   create(data: NewProduct): Promise<Product> {

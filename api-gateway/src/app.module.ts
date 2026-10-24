@@ -17,6 +17,7 @@ import { RequestLoggerMiddleware } from './common/middleware/request-logger.midd
 import { validateEnv } from './config/env.validation.js';
 import type { EnvironmentVariables } from './config/interfaces/environment-variables.interface.js';
 import { createDataSourceOptions } from './database/database.config.js';
+import { ElasticsearchModule } from './elasticsearch/elasticsearch.module.js';
 import { createGraphqlOptions } from './graphql/graphql.config.js';
 import { HealthModule } from './health/health.module.js';
 import { createQueueConnectionOptions } from './messaging/queue-connection.options.js';
@@ -55,6 +56,7 @@ import { WebhooksModule } from './webhooks/webhooks.module.js';
       useFactory: createGraphqlOptions,
     }),
     CacheModule,
+    ElasticsearchModule,
     AuthModule,
     RateLimitModule,
     ProductsModule,
