@@ -37,6 +37,24 @@ Interactive Swagger UI: **http://localhost:3000/api/docs** (raw OpenAPI JSON at 
 - **Security headers** via `helmet` (CSP, HSTS, no-sniff, frame protection, no `X-Powered-By`).
 - **CORS** is off unless `CORS_ORIGINS` lists allowed browser origins (comma-separated).
 
+## Product search (Elasticsearch)
+
+`GET /api/products?search=…` (and the GraphQL `products(search: …)` query) searches with Elasticsearch when `ELASTICSEARCH_URL` is set (docker compose sets it):
+
+- **typos are forgiven**: `headphnes` → Wireless Headphones, `algoritms` → Introduction to Algorithms;
+- **words in any order**, in the name (weighted ×3) and the description: `kettle electric` → Electric Kettle;
+- **as you type**: the last word may be unfinished, `wireless headph`;
+- **exact SKU**, any case: `acc-key-01`;
+- `sortBy=relevance` puts the best match first; the other sorts and the `categoryId` / `minPrice` / `maxPrice` filters work as without a search.
+
+**Elasticsearch finds, Postgres answers.** The index (`products_v2`) holds only what is searched, filtered or sorted on; it returns the ids of the matches in order, and the products are then read from Postgres, so prices and stock are never stale. Only active, not deleted products are indexed.
+
+**Kept in sync with both services.** Products change here and, directly in the database, in the admin service. A sync job writes every product changed since the last sync again (or removes it when inactive or deleted), and runs after this service's product writes, after the admin service's catalogue webhook, at start and every 5 minutes as a safety net. It runs on a BullMQ queue with deduplication: at most one sync runs and one waits, so a change made during a sync always gets a sync after it. Rewriting a product is harmless, so syncs can overlap (each one re-reads a minute before the last), and the time up to which the index is in sync is stored in the index's own metadata: a new or lost index is rebuilt completely. A changed mapping gets a new index name (`products_v1` → `products_v2`); the new one fills itself on start and the old one is deleted.
+
+**Never a hard dependency.** With `ELASTICSEARCH_URL` empty, or while Elasticsearch is down or still building its index, the search runs on Postgres instead (a plain substring match, newest first for `relevance`), and `/api/health` reports `"elasticsearch": "down"` with status `degraded`. Cached search results are dropped whenever the index changes, so answers given by the fallback don't linger once Elasticsearch is back.
+
+**Why Elasticsearch here?** With a small catalogue Postgres is just as fast; what Elasticsearch adds is search quality (typos, relevance, word order), plus speed and load off the main database once the catalogue grows large (`ILIKE '%…%'` reads every row). A small shop could start with Postgres's own full-text search and trigram indexes, and add Elasticsearch when search outgrows them.
+
 ## GraphQL
 
 A read-only GraphQL API at **`POST /api/graphql`** (also through Nginx: http://localhost:8080/api/graphql), next to the REST API. The resolvers call the same services as the REST controllers, so the Redis cache, access rules, validation, rate limits and errors are shared; writes stay in REST, where checkout has its Idempotency-Key handling. The schema is in [`src/graphql/schema.gql`](src/graphql/schema.gql), regenerated from the decorated classes on every start outside production, so every change to the API shows up in review.

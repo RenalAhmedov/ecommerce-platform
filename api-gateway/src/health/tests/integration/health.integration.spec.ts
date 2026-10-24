@@ -14,7 +14,10 @@ describe('Health (integration)', () => {
 
     expect(response).toMatchObject({
       status: 200,
-      body: { status: 'ok', checks: { database: 'up', redis: 'up' } },
+      body: {
+        status: 'ok',
+        checks: { database: 'up', redis: 'up', elasticsearch: 'disabled' },
+      },
     });
   });
 });

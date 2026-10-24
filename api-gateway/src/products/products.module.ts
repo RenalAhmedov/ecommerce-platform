@@ -13,6 +13,7 @@ import { ProductSearchProcessor } from './queues/product-search.processor.js';
 import { ProductSearchProducer } from './queues/product-search.producer.js';
 import { PRODUCT_SEARCH_QUEUE } from './search/product-search.constants.js';
 import { ProductSearchRepository } from './search/product-search.repository.js';
+import { ProductSearchService } from './search/product-search.service.js';
 import { ProductSearchSyncService } from './search/product-search-sync.service.js';
 import { ProductCatalogService } from './services/product-catalog.service.js';
 import { ProductsReadService } from './services/products-read.service.js';
@@ -37,6 +38,7 @@ import { ProductValidator } from './validators/product.validator.js';
     ProductCatalogService,
     ProductChangeNotifier,
     ProductSearchRepository,
+    ProductSearchService,
     ProductSearchSyncService,
     ProductSearchProducer,
     ProductSearchProcessor,

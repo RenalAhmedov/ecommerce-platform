@@ -1,12 +1,24 @@
 import type { Client } from '@elastic/elasticsearch';
 import { Inject, Injectable } from '@nestjs/common';
 import { ELASTICSEARCH_CLIENT } from '../../elasticsearch/elasticsearch.constants.js';
-import { PRODUCT_SEARCH_INDEX } from './product-search.constants.js';
+import {
+  PRODUCT_SEARCH_INDEX,
+  PRODUCT_SEARCH_INDEX_PATTERN,
+} from './product-search.constants.js';
 import type { ProductSearchDocument } from './product-search-document.js';
 import {
   PRODUCT_SEARCH_MAPPINGS,
   PRODUCT_SEARCH_SETTINGS,
 } from './product-search.index-definition.js';
+import {
+  buildProductSearchRequest,
+  type ProductSearchFilters,
+} from './product-search.query.js';
+
+export interface ProductSearchHits {
+  ids: number[];
+  total: number;
+}
 
 /**
  * The only class that talks to Elasticsearch. The time up to which the index
@@ -23,7 +35,18 @@ export class ProductSearchRepository {
     return this.client !== null;
   }
 
-  /** @returns true when the index had to be created. */
+  /** Ids of the matching products in the requested order, and how many match in total. */
+  async search(filters: ProductSearchFilters): Promise<ProductSearchHits> {
+    const response = await this.es().search(buildProductSearchRequest(filters));
+    const { total } = response.hits;
+
+    return {
+      ids: response.hits.hits.map((hit) => Number(hit._id)),
+      total: typeof total === 'number' ? total : (total?.value ?? 0),
+    };
+  }
+
+  /** @returns true when the index had to be created (older versions of it are then removed). */
   async ensureIndex(): Promise<boolean> {
     if (await this.es().indices.exists({ index: PRODUCT_SEARCH_INDEX })) {
       return false;
@@ -41,6 +64,8 @@ export class ProductSearchRepository {
         throw error;
       }
     }
+
+    await this.deleteOutdatedIndices();
 
     return true;
   }
@@ -92,6 +117,20 @@ export class ProductSearchRepository {
       throw new Error(
         `Search index rejected ${failed.length} of ${response.items.length} changes`,
       );
+    }
+  }
+
+  /** Deleted by name: Elasticsearch refuses wildcard deletes. */
+  private async deleteOutdatedIndices(): Promise<void> {
+    const indices = await this.es().indices.get({
+      index: PRODUCT_SEARCH_INDEX_PATTERN,
+    });
+    const outdated = Object.keys(indices).filter(
+      (name) => name !== PRODUCT_SEARCH_INDEX,
+    );
+
+    if (outdated.length > 0) {
+      await this.es().indices.delete({ index: outdated });
     }
   }
 

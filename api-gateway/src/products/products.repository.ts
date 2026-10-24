@@ -78,6 +78,20 @@ export class ProductsRepository {
       .getOne();
   }
 
+  /** The active ones among the given products, in the given order. */
+  async findActiveByIds(ids: number[]): Promise<Product[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const products = await this.createActiveProductsQuery()
+      .andWhere('product.id IN (:...ids)', { ids })
+      .getMany();
+    const byId = new Map(products.map((product) => [product.id, product]));
+
+    return ids.flatMap((id) => byId.get(id) ?? []);
+  }
+
   getById(id: number): Promise<Product> {
     return this.createProductsQuery()
       .where('product.id = :id', { id })

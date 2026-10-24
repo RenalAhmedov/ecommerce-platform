@@ -16,7 +16,9 @@ export const PRODUCT_SEARCH_MAPPINGS: estypes.MappingTypeMapping = {
   properties: {
     id: { type: 'long' },
     // Matches whole words, typos ("headphnes") and the start of a word as you type ("headph").
-    name: { type: 'search_as_you_type' },
+    name: { type: 'search_as_you_type', copy_to: 'nameSort' },
+    // Sorting by name (a searchable text field can't be sorted on); filled from name, not sent.
+    nameSort: { type: 'keyword', normalizer: 'lowercase' },
     sku: { type: 'keyword', normalizer: 'lowercase' },
     description: { type: 'text' },
     categoryId: { type: 'long' },

@@ -17,4 +17,6 @@ export const SORT_COLUMNS: Record<ProductSortField, string> = {
   [ProductSortField.CreatedAt]: 'product.createdAt',
   [ProductSortField.Price]: 'product.price',
   [ProductSortField.Name]: 'product.name',
+  // Postgres has no relevance score; Elasticsearch does (products/search).
+  [ProductSortField.Relevance]: 'product.createdAt',
 };

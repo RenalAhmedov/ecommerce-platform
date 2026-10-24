@@ -7,7 +7,7 @@ import type * as TestAppModule from '../../../common/tests/integration/test-app.
 import { PRODUCT_SEARCH_INDEX } from '../../search/product-search.constants.js';
 
 /** Only this suite starts Elasticsearch; the others run with search off (Postgres). */
-describe('Product search index sync (integration)', () => {
+describe('Product search (integration)', () => {
   let elasticsearch: StartedElasticsearchContainer;
   let es: Client;
   let testApp: TestAppModule.TestApp;
@@ -36,7 +36,8 @@ describe('Product search index sync (integration)', () => {
   afterAll(async () => {
     await testApp?.close();
     await es?.close();
-    await elasticsearch?.stop();
+    // The last test already stopped it.
+    await elasticsearch?.stop().catch(() => undefined);
   });
 
   beforeEach(async () => {
@@ -51,13 +52,45 @@ describe('Product search index sync (integration)', () => {
     ));
   });
 
-  const createProduct = async (name: string, sku: string) =>
+  const createProduct = async (
+    name: string,
+    sku: string,
+    extra: { price?: number; description?: string } = {},
+  ) =>
     (
       await testApp.request<{ id: number }>('POST', '/products', {
-        body: { name, sku, price: 10 },
+        body: { name, sku, price: 10, ...extra },
         token: adminToken,
       })
     ).body.id;
+
+  const indexedCount = async () =>
+    (
+      await es
+        .count({ index: PRODUCT_SEARCH_INDEX })
+        .catch(() => ({ count: -1 }))
+    ).count;
+
+  const searchNames = async (query: string) => {
+    const { body } = await testApp.request<{
+      data: { name: string }[];
+      meta: { total: number };
+    }>('GET', `/products?${query}`);
+
+    return body.data.map((product) => product.name);
+  };
+
+  /** A small catalogue, fully indexed. */
+  const createCatalogue = async () => {
+    await createProduct('Wireless Headphones', 'AUD-HP-01', { price: 129.9 });
+    await createProduct('Desk Lamp', 'DEC-LMP-01', { price: 49.9 });
+    await createProduct('Ceramic Mug', 'KIT-MUG-01', { price: 12.5 });
+    await createProduct('Reading Light', 'DEC-RDL-01', {
+      price: 29.9,
+      description: 'A small lamp for reading in bed.',
+    });
+    await waitFor(async () => (await indexedCount()) === 4, 15_000);
+  };
 
   const indexed = async (id: number) => {
     const exists = await es
@@ -119,13 +152,82 @@ describe('Product search index sync (integration)', () => {
     );
   });
 
-  it('rebuilds a lost index completely', async () => {
+  it('rebuilds a lost index completely and deletes outdated versions', async () => {
     const mug = await createProduct('Blue Mug', 'MUG-1');
     await waitFor(async () => (await indexed(mug)) !== null, 15_000);
 
     await es.indices.delete({ index: PRODUCT_SEARCH_INDEX });
+    await es.indices.create({ index: 'products_v1' });
     await adminServiceChangedProducts();
 
     await waitFor(async () => (await indexed(mug)) !== null, 15_000);
+    expect(await es.indices.exists({ index: 'products_v1' })).toBe(false);
+  });
+
+  it('forgives typos, matches word starts and exact SKUs', async () => {
+    await createCatalogue();
+
+    expect(await searchNames('search=headphnes')).toEqual([
+      'Wireless Headphones',
+    ]);
+    // As you type: the last word may be unfinished.
+    expect(await searchNames('search=wireless%20headph')).toEqual([
+      'Wireless Headphones',
+    ]);
+    expect(await searchNames('search=headphones%20wireless')).toEqual([
+      'Wireless Headphones',
+    ]);
+    expect(await searchNames('search=kit-mug-01')).toEqual(['Ceramic Mug']);
+  });
+
+  it('puts the best match first when sorting by relevance, and filters like REST', async () => {
+    await createCatalogue();
+
+    expect(await searchNames('search=lamp&sortBy=relevance')).toEqual([
+      'Desk Lamp',
+      'Reading Light',
+    ]);
+    expect(await searchNames('search=lamp&maxPrice=40')).toEqual([
+      'Reading Light',
+    ]);
+    expect(await searchNames('search=lamp&sortBy=price&sortOrder=asc')).toEqual(
+      ['Reading Light', 'Desk Lamp'],
+    );
+  });
+
+  it('searches the same way through GraphQL', async () => {
+    await createCatalogue();
+
+    const { body } = await testApp.request<{
+      data: { products: { data: { name: string }[] } };
+    }>('POST', '/graphql', {
+      body: {
+        query:
+          '{ products(search: "headphnes", sortBy: Relevance) { data { name } } }',
+      },
+    });
+
+    expect(body.data.products.data).toEqual([{ name: 'Wireless Headphones' }]);
+  });
+
+  // Last: it stops Elasticsearch.
+  it('falls back to Postgres when Elasticsearch is down, and reports it', async () => {
+    await createCatalogue();
+    const healthy = await testApp.request<{ checks: object }>('GET', '/health');
+
+    await elasticsearch.stop();
+
+    const degraded = await testApp.request<{
+      status: string;
+      checks: object;
+    }>('GET', '/health');
+    expect(healthy.body.checks).toMatchObject({ elasticsearch: 'up' });
+    expect(degraded.body).toMatchObject({
+      status: 'degraded',
+      checks: { elasticsearch: 'down' },
+    });
+    // Plain substring search still works; typo tolerance needs Elasticsearch.
+    expect(await searchNames('search=lamp')).toEqual(['Desk Lamp']);
+    expect(await searchNames('search=headphnes')).toEqual([]);
   });
 });

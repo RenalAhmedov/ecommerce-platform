@@ -1,3 +1,4 @@
+import type { ProductsCache } from '../../products.cache.js';
 import type { ProductsRepository } from '../../products.repository.js';
 import type { IndexableProduct } from '../../search/product-search-document.js';
 import type { ProductSearchRepository } from '../../search/product-search.repository.js';
@@ -15,6 +16,7 @@ describe('ProductSearchSyncService', () => {
     markSyncedUntil: ReturnType<typeof vi.fn>;
     apply: ReturnType<typeof vi.fn>;
   };
+  let cache: { invalidate: ReturnType<typeof vi.fn> };
   let service: ProductSearchSyncService;
 
   const product = (id: number, overrides: Partial<IndexableProduct> = {}) =>
@@ -44,9 +46,11 @@ describe('ProductSearchSyncService', () => {
       markSyncedUntil: vi.fn(),
       apply: vi.fn(),
     };
+    cache = { invalidate: vi.fn() };
     service = new ProductSearchSyncService(
       products as unknown as ProductsRepository,
       index as unknown as ProductSearchRepository,
+      cache as unknown as ProductsCache,
     );
   });
 
@@ -93,6 +97,20 @@ describe('ProductSearchSyncService', () => {
     expect(index.apply).toHaveBeenCalledWith(
       [expect.objectContaining({ id: 1, price: 10 })],
       [2, 3, 4],
+    );
+  });
+
+  it('drops cached search results once the index changed, and only then', async () => {
+    await service.sync();
+    expect(cache.invalidate).not.toHaveBeenCalled();
+
+    products.findIdsChangedSince.mockResolvedValue([1]);
+    products.findIndexableByIds.mockResolvedValue([product(1)]);
+    await service.sync();
+
+    expect(cache.invalidate).toHaveBeenCalledTimes(1);
+    expect(index.apply.mock.invocationCallOrder[0]).toBeLessThan(
+      cache.invalidate.mock.invocationCallOrder[0],
     );
   });
 

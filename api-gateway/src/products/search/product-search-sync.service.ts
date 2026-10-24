@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ProductsCache } from '../products.cache.js';
 import { ProductsRepository } from '../products.repository.js';
 import {
   PRODUCT_SEARCH_BATCH_SIZE,
@@ -26,6 +27,7 @@ export class ProductSearchSyncService {
   constructor(
     private readonly productsRepository: ProductsRepository,
     private readonly productSearchRepository: ProductSearchRepository,
+    private readonly productsCache: ProductsCache,
   ) {}
 
   async sync(): Promise<ProductSearchSyncResult> {
@@ -56,6 +58,9 @@ export class ProductSearchSyncService {
     await this.productSearchRepository.markSyncedUntil(startedAt);
 
     if (created || changedIds.length > 0) {
+      // Searches cached before the index changed (or while it was missing and
+      // Postgres answered instead) would otherwise be served for another minute.
+      await this.productsCache.invalidate();
       this.logger.log(
         `Search index ${created ? 'built' : 'updated'}: ${result.indexed} product(s) indexed, ${result.removed} removed in ${Date.now() - startedAt.getTime()}ms`,
       );

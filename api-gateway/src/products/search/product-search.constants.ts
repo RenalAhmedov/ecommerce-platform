@@ -1,5 +1,8 @@
 /** Versioned: a changed mapping gets a new index, which fills itself on the next sync. */
-export const PRODUCT_SEARCH_INDEX = 'products_v1';
+export const PRODUCT_SEARCH_INDEX = 'products_v2';
+
+/** Older versions of the index, deleted once the current one exists. */
+export const PRODUCT_SEARCH_INDEX_PATTERN = 'products_v*';
 
 export const PRODUCT_SEARCH_QUEUE = 'product-search';
 export const SYNC_PRODUCT_SEARCH_JOB = 'sync-products';

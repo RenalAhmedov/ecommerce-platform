@@ -94,6 +94,9 @@ enum ProductSortField {
   CreatedAt
   Name
   Price
+
+  """Best match first (with a search term); otherwise newest first."""
+  Relevance
 }
 
 type Query {
