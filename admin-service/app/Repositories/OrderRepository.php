@@ -48,6 +48,11 @@ class OrderRepository
     }
 
     /** Re-reads the row with SELECT … FOR UPDATE, as the Nest api-gateway does before any status change. */
+    public function findWithCustomer(int $id): ?Order
+    {
+        return Order::with(['user' => fn ($query) => $query->withTrashed()])->find($id);
+    }
+
     public function lockById(int $id): Order
     {
         return Order::whereKey($id)->lockForUpdate()->firstOrFail();

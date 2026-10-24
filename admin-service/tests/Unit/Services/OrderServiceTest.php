@@ -3,12 +3,16 @@
 namespace Tests\Unit\Services;
 
 use App\Enums\OrderStatus;
+use App\Events\OrderPaid;
+use App\Events\OrderStatusChanged;
 use App\Models\Order;
 use App\Models\User;
 use App\Repositories\OrderRepository;
 use App\Services\CatalogNotifier;
 use App\Services\InventoryService;
 use App\Services\OrderService;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Mockery\MockInterface;
 use Tests\Unit\UnitTestCase;
@@ -34,7 +38,8 @@ class OrderServiceTest extends UnitTestCase
         $this->catalog = $this->mock(CatalogNotifier::class);
         $this->catalog->shouldReceive('catalogChanged')->byDefault();
         $this->service = app(OrderService::class);
-        $this->admin = User::factory()->admin()->make(['id' => 1]);
+        $this->admin = User::factory()->admin()->make(['id' => 1, 'name' => 'Shop Admin']);
+        Event::fake([OrderStatusChanged::class, OrderPaid::class]);
     }
 
     private function order(OrderStatus $status): Order
@@ -57,6 +62,9 @@ class OrderServiceTest extends UnitTestCase
         $result = $this->service->changeStatus($this->order(OrderStatus::Paid), OrderStatus::Processing, $this->admin);
 
         $this->assertSame(OrderStatus::Processing, $result->status);
+        Event::assertDispatched(OrderStatusChanged::class, fn (OrderStatusChanged $event) => $event->orderId === 10
+            && $event->status === OrderStatus::Processing
+            && $event->changedBy === 'Shop Admin');
     }
 
     public function test_the_status_is_checked_on_the_locked_row_not_the_stale_one(): void
@@ -72,6 +80,7 @@ class OrderServiceTest extends UnitTestCase
         } catch (ValidationException $e) {
             $this->assertSame(['status' => ['Order ORD-1 is Cancelled and cannot be changed to Cancelled.']], $e->errors());
         }
+        Event::assertNotDispatched(OrderStatusChanged::class);
     }
 
     public function test_cancelling_returns_the_ordered_quantities_to_stock(): void
@@ -94,5 +103,32 @@ class OrderServiceTest extends UnitTestCase
         $this->expectException(ValidationException::class);
 
         $this->service->changeStatus($this->order(OrderStatus::Pending), OrderStatus::Cancelled, $this->admin);
+    }
+
+    public function test_a_paid_shop_order_is_announced_to_the_admins(): void
+    {
+        $order = $this->order(OrderStatus::Paid)->forceFill(['total' => '45.00']);
+        $order->setRelation('user', User::factory()->make(['name' => 'Ada Lovelace']));
+        $this->orders->shouldReceive('findWithCustomer')->once()->with(10)->andReturn($order);
+
+        $this->service->announcePaid(10);
+
+        Event::assertDispatched(OrderPaid::class, fn (OrderPaid $event) => $event->broadcastWith() === [
+            'id' => 10,
+            'orderNumber' => 'ORD-1',
+            'total' => '45.00',
+            'customer' => 'Ada Lovelace',
+            'url' => '/orders/10',
+        ]);
+    }
+
+    public function test_an_announcement_for_an_unknown_order_is_only_logged(): void
+    {
+        $this->orders->shouldReceive('findWithCustomer')->andReturnNull();
+        Log::shouldReceive('warning')->once()->with('Paid order announced by the api-gateway does not exist', ['order_id' => 404]);
+
+        $this->service->announcePaid(404);
+
+        Event::assertNotDispatched(OrderPaid::class);
     }
 }

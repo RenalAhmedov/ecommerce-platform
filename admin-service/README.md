@@ -218,6 +218,15 @@ The panel receives events over WebSockets: [Laravel Reverb](https://reverb.larav
 
 Events go to one private channel, `admin.orders`. Before joining, Echo asks `POST /broadcasting/auth`, which only answers for logged-in admins (`routes/channels.php`), signed with `REVERB_APP_SECRET`. The key is public (the layout puts it in a `<meta>` tag); the secret never leaves the server. In tests broadcasting is off (`BROADCAST_CONNECTION=null`).
 
+What admins see, on every page of the panel:
+
+| Event | Comes from | In the panel |
+|---|---|---|
+| `order.paid` | a customer paid in the shop: the api-gateway publishes `order.paid` on Redis, and the `admin-events` container (`php artisan orders:listen`) picks it up | a toast "New order ORD-… from Ada Lovelace: 45.00", linking to the order |
+| `order.status-changed` | an admin changed an order's status (`OrderService::changeStatus`) | the order's status badges update in place (orders list, order page, dashboard); the other admins also get a toast |
+
+Both events are queued, so the `admin-worker` sends them to Reverb: a Reverb hiccup is retried instead of failing an admin's request. Redis pub/sub keeps no history, so an `order.paid` published while `admin-events` is down is missed: the order is still there, only the toast is lost.
+
 ## Redis and the queue worker
 
 Sessions, cache and queues use the shared Redis. Every Laravel key starts with `admin:` (`REDIS_PREFIX`), so it never collides with the Nest service's keys (`bull:*`, `idempotency:*`, `products:*`, `auth:*`).

@@ -130,6 +130,18 @@ services:
       admin-migrate:
         condition: service_completed_successfully
 
+  admin-events:
+    <<: *admin-service
+    restart: unless-stopped
+    command: ["php", "artisan", "orders:listen"]
+    healthcheck:
+      disable: true
+    depends_on:
+      admin-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
   # queue:work keeps the booted app in memory (fast); --max-time restarts it hourly
   # so memory never creeps up, and `restart` brings it straight back.
   admin-worker:

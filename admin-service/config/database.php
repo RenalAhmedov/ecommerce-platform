@@ -39,5 +39,13 @@ return [
             ...$redisConnection(env('REDIS_SHARED_DB', '0')),
             'options' => ['prefix' => ''],
         ],
+
+        // Subscribes to the api-gateway's events (orders:listen): no prefix, and it
+        // waits for messages indefinitely instead of timing out.
+        'events' => [
+            ...$redisConnection(env('REDIS_SHARED_DB', '0')),
+            'read_timeout' => -1,
+            'options' => ['prefix' => ''],
+        ],
     ],
 ];

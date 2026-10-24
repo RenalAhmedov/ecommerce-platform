@@ -115,7 +115,7 @@
                                     <td class="py-2 font-mono"><a href="{{ route('orders.show', $order['id']) }}" class="text-indigo-600 hover:underline">{{ $order['orderNumber'] }}</a></td>
                                     <td class="py-2">{{ $order['customer'] }}</td>
                                     <td class="py-2 text-right">{{ $order['total'] }}</td>
-                                    <td class="py-2 text-right"><x-order-status :status="OrderStatus::from($order['status'])" /></td>
+                                    <td class="py-2 text-right"><x-order-status :status="OrderStatus::from($order['status'])" :order="$order['id']" /></td>
                                 </tr>
                             @empty
                                 <tr><td class="py-2 text-gray-500">{{ __('No orders yet.') }}</td></tr>

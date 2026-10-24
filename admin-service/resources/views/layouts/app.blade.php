@@ -6,6 +6,7 @@
         <meta name="csrf-token" content="{{ csrf_token() }}">
         @if (config('broadcasting.default') === 'reverb')
             <meta name="reverb-key" content="{{ config('broadcasting.connections.reverb.key') }}">
+            <meta name="user-id" content="{{ auth()->id() }}">
         @endif
 
         <title>{{ config('app.name', 'Laravel') }}</title>
@@ -40,5 +41,8 @@
                 {{ $slot }}
             </main>
         </div>
+
+        {{-- Live order notifications (resources/js/live-orders.js) --}}
+        <div id="toasts" class="fixed bottom-4 right-4 z-50 flex w-80 flex-col gap-2" aria-live="polite"></div>
     </body>
 </html>

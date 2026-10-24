@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Enums\OrderStatus;
+use App\Events\OrderPaid;
+use App\Events\OrderStatusChanged;
 use App\Models\Order;
 use App\Models\User;
 use App\Repositories\OrderRepository;
@@ -76,6 +78,24 @@ class OrderService
             $this->catalog->catalogChanged('order cancelled, stock returned');
         }
 
+        OrderStatusChanged::dispatch($order, $admin);
+
         return $order;
+    }
+
+    /** The api-gateway took a payment: tells every admin with the panel open. */
+    public function announcePaid(int $orderId): void
+    {
+        $order = $this->orders->findWithCustomer($orderId);
+
+        if ($order === null) {
+            Log::warning('Paid order announced by the api-gateway does not exist', ['order_id' => $orderId]);
+
+            return;
+        }
+
+        OrderPaid::dispatch($order);
+
+        Log::info('Admins notified of a paid shop order', ['order_id' => $order->id, 'order_number' => $order->order_number]);
     }
 }

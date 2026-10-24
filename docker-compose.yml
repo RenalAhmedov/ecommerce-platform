@@ -153,6 +153,12 @@ services:
       timeout: 3s
       retries: 3
 
+  # Turns the api-gateway's order.paid events (Redis pub/sub) into live notifications in the panel.
+  admin-events:
+    <<: *admin-service
+    command: ["php", "artisan", "orders:listen"]
+    ports: []
+
   # Development: queue:listen reloads the code for every job. Production uses queue:work.
   admin-worker:
     <<: *admin-service
