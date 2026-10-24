@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM node:24-alpine AS deps
+FROM node:25-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
@@ -16,7 +16,7 @@ RUN npm run build && npm prune --omit=dev
 
 # Production: compiled JavaScript and production dependencies only, as the unprivileged "node" user.
 # Migrations: `npm run typeorm -- migration:run` with this image, before starting new instances.
-FROM node:24-alpine AS prod
+FROM node:25-alpine AS prod
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build --chown=node:node /app/package.json ./
