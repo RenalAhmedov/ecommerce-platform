@@ -10,16 +10,11 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
-/**
- * The category tree. Only this service writes categories (the Nest API only
- * reads them), so the dropdown options are cached in Redis and cleared by
- * every write here, after its transaction has committed.
- */
 class CategoryService
 {
     private const OPTIONS_CACHE_KEY = 'categories:options';
 
-    /** Safety net in case a read races a write; normally the entry is cleared by the write. */
+    // Every category write clears the cached options; the TTL is only a safety net.
     private const OPTIONS_CACHE_SECONDS = 3600;
 
     public function __construct(
@@ -28,14 +23,7 @@ class CategoryService
         private readonly CatalogNotifier $catalog,
     ) {}
 
-    /**
-     * Active categories in tree order (each parent followed by its children,
-     * siblings by name). A category whose parent is trashed is shown as a root.
-     * $withoutSubtreeOf leaves out that category and everything below it, which
-     * are exactly the parents it may not be moved under.
-     *
-     * @return list<array{category: Category, depth: int}>
-     */
+    /** @return list<array{category: Category, depth: int}> */
     public function tree(?int $withoutSubtreeOf = null): array
     {
         $categories = $this->categories->allActive();
@@ -57,13 +45,7 @@ class CategoryService
         return $rows;
     }
 
-    /**
-     * id => indented name, for select inputs. The full list (used on every
-     * product page) is cached; the list without a subtree (only on the
-     * category edit page) is built fresh.
-     *
-     * @return array<int, string>
-     */
+    /** @return array<int, string> */
     public function options(?int $withoutSubtreeOf = null): array
     {
         if ($withoutSubtreeOf !== null) {
@@ -130,10 +112,6 @@ class CategoryService
         return $category;
     }
 
-    /**
-     * Products keep their category_id, so restoring the category brings them
-     * back into it; until then they show as uncategorised.
-     */
     public function delete(Category $category): void
     {
         DB::transaction(function () use ($category) {

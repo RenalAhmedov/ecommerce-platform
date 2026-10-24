@@ -7,11 +7,6 @@ use App\Enums\ReportPeriod;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
-/**
- * Sales figures for the dashboard and the reports, so "revenue" means the same
- * everywhere: orders in OrderStatus::revenueStatuses(), counted by payment
- * time, in [$from, $to). Money is returned as exact decimal strings.
- */
 class SalesRepository
 {
     /** @return array{orders: int, units: int, revenue: string, average: string} */
@@ -30,11 +25,7 @@ class SalesRepository
         return $this->toFigures($row);
     }
 
-    /**
-     * One row per period between $from and $to, including periods without sales.
-     *
-     * @return list<array{period: string, orders: int, units: int, revenue: string, average: string}>
-     */
+    /** @return list<array{period: string, orders: int, units: int, revenue: string, average: string}> */
     public function byPeriod(ReportPeriod $period, CarbonImmutable $from, CarbonImmutable $to): array
     {
         $rows = DB::select(

@@ -12,14 +12,10 @@ class InventoryRepository
         return Inventory::create(['product_id' => $productId, 'quantity' => $quantity]);
     }
 
-    /**
-     * SELECT … FOR UPDATE in product id order, the same order the Nest
-     * api-gateway uses, so the two services can never deadlock on stock rows.
-     *
-     * @param  list<int>  $productIds
-     */
+    /** @param  list<int>  $productIds */
     public function lockByProductIds(array $productIds): void
     {
+        // Same order as the api-gateway, so the two services can never deadlock on stock rows.
         sort($productIds);
 
         Inventory::whereIn('product_id', $productIds)->orderBy('product_id')->lockForUpdate()->get();

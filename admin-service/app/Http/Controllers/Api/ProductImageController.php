@@ -18,7 +18,6 @@ class ProductImageController extends Controller
         private readonly ProductService $products,
     ) {}
 
-    /** 202 Accepted: the image is processed by the queue worker, poll the product for imageUrl. */
     public function store(UploadProductImageRequest $request, Product $product): JsonResponse
     {
         $this->images->upload($product, $request->file('image'));

@@ -4,7 +4,6 @@ namespace App\Http\Requests\Categories;
 
 use Illuminate\Contracts\Validation\ValidationRule;
 
-/** Partial updates, like UpdateProductRequest. Loops in the tree are checked by CategoryService. */
 class UpdateCategoryRequest extends StoreCategoryRequest
 {
     /** @return array<string, ValidationRule|array<mixed>|string> */

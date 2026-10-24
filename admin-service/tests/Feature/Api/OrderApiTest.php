@@ -8,7 +8,6 @@ use App\Models\OrderItem;
 use Tests\Feature\Api\Concerns\AuthenticatesWithNestToken;
 use Tests\Feature\FeatureTestCase;
 
-/** Orders over the JSON API, in the Nest response shape. */
 class OrderApiTest extends FeatureTestCase
 {
     use AuthenticatesWithNestToken;

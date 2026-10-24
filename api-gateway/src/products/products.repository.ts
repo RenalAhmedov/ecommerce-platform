@@ -78,7 +78,6 @@ export class ProductsRepository {
       .getOne();
   }
 
-  /** The active ones among the given products, in the given order. */
   async findActiveByIds(ids: number[]): Promise<Product[]> {
     if (ids.length === 0) {
       return [];
@@ -106,7 +105,6 @@ export class ProductsRepository {
     return this.existsByColumn('slug', slug, excludeId);
   }
 
-  /** Ids of products created, changed or deleted after `since` (all of them when null), deleted ones included. */
   async findIdsChangedSince(since: Date | null): Promise<number[]> {
     const changedQuery = this.repository
       .createQueryBuilder('product')

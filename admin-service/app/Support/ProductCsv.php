@@ -7,17 +7,12 @@ use Generator;
 use Illuminate\Validation\ValidationException;
 use SplFileObject;
 
-/**
- * The product CSV format, shared by export and import so an exported file can
- * be edited in a spreadsheet and imported back.
- */
 final class ProductCsv
 {
     public const COLUMNS = ['sku', 'name', 'slug', 'description', 'price', 'category_slug', 'is_active', 'stock'];
 
     public const REQUIRED_COLUMNS = ['sku', 'name', 'price'];
 
-    /** Lets Excel detect UTF-8, so names like "Café" open correctly. */
     private const BOM = "\xEF\xBB\xBF";
 
     /** @param  resource  $output */
@@ -43,9 +38,6 @@ final class ProductCsv
     }
 
     /**
-     * Yields each data row keyed by column name, with its spreadsheet row
-     * number (the header is row 1). Unknown columns are ignored.
-     *
      * @return Generator<int, array<string, string>>
      *
      * @throws ValidationException when the header lacks a required column
@@ -78,10 +70,7 @@ final class ProductCsv
         return iterator_count(self::read($path));
     }
 
-    /**
-     * Spreadsheet apps run cells starting with = + - @ as formulas ("CSV
-     * injection"); a leading apostrophe makes them plain text.
-     */
+    // Spreadsheets run cells starting with = + - @ as formulas (CSV injection); an apostrophe disarms them.
     private static function neutralizeFormula(?string $value): ?string
     {
         return $value !== null && preg_match('/^[=+\-@\t\r]/', $value) ? "'".$value : $value;

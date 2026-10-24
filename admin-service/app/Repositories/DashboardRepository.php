@@ -10,11 +10,6 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
-/**
- * Read-only queries for the dashboard (revenue comes from SalesRepository).
- * Everything returns plain arrays: the dashboard caches them in Redis, and the
- * cache only stores plain data, never objects.
- */
 class DashboardRepository
 {
     /** @return array<string, int> status => number of orders, every status included */
@@ -38,11 +33,7 @@ class DashboardRepository
         ];
     }
 
-    /**
-     * Active products at or below their low-stock threshold, emptiest first.
-     *
-     * @return list<array{id: int, sku: string, name: string, quantity: int, threshold: int}>
-     */
+    /** @return list<array{id: int, sku: string, name: string, quantity: int, threshold: int}> */
     public function lowStock(int $limit): array
     {
         return Inventory::query()
@@ -58,11 +49,7 @@ class DashboardRepository
             ->all();
     }
 
-    /**
-     * Best sellers by units in orders paid since $since (deleted products included: they were still sold).
-     *
-     * @return list<array{id: int, sku: string, name: string, units: int, revenue: string}>
-     */
+    /** @return list<array{id: int, sku: string, name: string, units: int, revenue: string}> */
     public function topSellers(CarbonImmutable $since, int $limit): array
     {
         return DB::table('order_items')

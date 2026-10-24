@@ -9,12 +9,7 @@ class ReportExportService
 {
     private const CSV_COLUMNS = ['period_start', 'period', 'orders', 'units', 'revenue', 'average_order_value'];
 
-    /**
-     * One row per period plus a TOTAL row; plain numbers (no currency signs)
-     * so spreadsheets can sum and chart them.
-     *
-     * @param  resource  $output
-     */
+    /** @param  resource  $output */
     public function writeCsv(SalesReport $report, $output): void
     {
         fputcsv($output, self::CSV_COLUMNS, escape: '');
@@ -27,11 +22,7 @@ class ReportExportService
         fputcsv($output, ['', 'TOTAL', $totals['orders'], $totals['units'], $totals['revenue'], $totals['average']], escape: '');
     }
 
-    /**
-     * Rendered synchronously: a report is capped at a few hundred rows
-     * (ReportPeriod::maxPeriods), which Dompdf turns into a PDF in about a
-     * second, so a queued job plus polling for the file would only add waiting.
-     */
+    // Synchronous on purpose: a report has at most a few hundred rows, about a second of rendering.
     public function pdf(SalesReport $report): string
     {
         return Pdf::loadView('reports.pdf', ['report' => $report])

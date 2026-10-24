@@ -6,11 +6,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-/**
- * Same field names as the Nest UserResponseDto, plus deletedAt and the order count.
- *
- * @mixin User
- */
+/** @mixin User */
 class UserResource extends JsonResource
 {
     /** @return array<string, mixed> */

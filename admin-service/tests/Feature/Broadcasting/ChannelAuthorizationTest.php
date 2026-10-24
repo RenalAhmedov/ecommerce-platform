@@ -7,7 +7,6 @@ use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Testing\TestResponse;
 use Tests\Feature\FeatureTestCase;
 
-/** Echo asks POST /broadcasting/auth before joining a private channel; the answer is signed with the app secret. */
 class ChannelAuthorizationTest extends FeatureTestCase
 {
     protected function setUp(): void

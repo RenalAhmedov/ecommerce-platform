@@ -10,7 +10,6 @@ use RedisException;
 use Tests\Feature\Api\Concerns\AuthenticatesWithNestToken;
 use Tests\Feature\FeatureTestCase;
 
-/** The admin API accepts the access tokens issued by the Nest api-gateway, and only those of admins. */
 class JwtAuthenticationTest extends FeatureTestCase
 {
     use AuthenticatesWithNestToken;

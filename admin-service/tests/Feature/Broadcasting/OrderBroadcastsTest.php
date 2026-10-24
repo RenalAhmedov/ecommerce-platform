@@ -40,7 +40,6 @@ class OrderBroadcastsTest extends FeatureTestCase
         });
     }
 
-    /** The exact message the api-gateway's ClientRedis publishes. */
     public function test_an_order_paid_in_the_shop_becomes_a_live_notification(): void
     {
         Event::fake([OrderPaid::class]);

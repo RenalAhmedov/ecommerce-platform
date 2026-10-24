@@ -19,7 +19,7 @@ Without Docker for the app itself: `npm run start:dev` (stop the `api-gateway` c
 
 ### Health check
 
-`GET /api/health` → `200 {"status":"ok","checks":{"database":"up","redis":"up"}}`. `"degraded"` (still 200) means Redis is down, which every feature survives; no database means `503`. Docker uses it for the container's health, and it is never rate-limited or logged.
+`GET /api/health` → `200 {"status":"ok","checks":{"database":"up","redis":"up","elasticsearch":"up"}}` (`"disabled"` without `ELASTICSEARCH_URL`). `"degraded"` (still 200) means Redis or Elasticsearch is down, which every feature survives; no database means `503`. Docker uses it for the container's health, and it is never rate-limited or logged.
 
 ### Docker image
 

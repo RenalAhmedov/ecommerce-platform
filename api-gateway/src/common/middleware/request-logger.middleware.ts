@@ -8,15 +8,8 @@ import {
   REQUEST_ID_PATTERN,
 } from '../constants/request-id.constants.js';
 
-/** Polled by Docker and Nginx every few seconds; logging it would only add noise. */
 const SILENT_PATHS = new Set(['/api/health']);
 
-/**
- * Logs one line per request with its status, duration, user and request id.
- * The id is kept from X-Request-Id when the caller sent a valid one (the admin
- * service does, so one action can be followed through both services' logs),
- * otherwise generated, and is returned in the same header.
- */
 @Injectable()
 export class RequestLoggerMiddleware implements NestMiddleware {
   private readonly logger = new Logger('HTTP');

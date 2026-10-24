@@ -6,12 +6,7 @@ use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-/**
- * Same field names as the Nest OrderResponseDto, plus the customer and the
- * statuses an admin may move the order to. Items appear when loaded (detail).
- *
- * @mixin Order
- */
+/** @mixin Order */
 class OrderResource extends JsonResource
 {
     /** @return array<string, mixed> */

@@ -17,7 +17,6 @@ class LoginRequest extends FormRequest
         ];
     }
 
-    /** Emails are stored lower-cased (as the Nest service does), so "Ada@Example.com" still finds the account. */
     protected function prepareForValidation(): void
     {
         if ($this->has('email')) {

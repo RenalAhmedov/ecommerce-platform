@@ -8,7 +8,6 @@ use Illuminate\Support\Facades\Redis;
 use Tests\Feature\Api\Concerns\AuthenticatesWithNestToken;
 use Tests\Feature\FeatureTestCase;
 
-/** Shared session: an api-gateway token opens the panel, and the two then end together. Real Redis throughout. */
 class TokenLoginTest extends FeatureTestCase
 {
     use AuthenticatesWithNestToken;

@@ -15,7 +15,6 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Tests\Feature\FeatureTestCase;
 
-/** Catalogue changes made in the panel reach the Nest api-gateway's webhook. */
 class CatalogWebhookTest extends FeatureTestCase
 {
     private const KEY = 'feature-test-internal-api-key-0123456789abcdef';

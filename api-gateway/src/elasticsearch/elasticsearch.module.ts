@@ -9,7 +9,6 @@ import { ConfigService } from '@nestjs/config';
 import type { EnvironmentVariables } from '../config/interfaces/environment-variables.interface.js';
 import { ELASTICSEARCH_CLIENT } from './elasticsearch.constants.js';
 
-/** Provides the client, or null when ELASTICSEARCH_URL is empty (search then runs on Postgres). */
 @Global()
 @Module({
   providers: [

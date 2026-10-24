@@ -4,10 +4,6 @@ namespace App\Validation;
 
 use Illuminate\Validation\Rule;
 
-/**
- * Product validation shared by the form/API requests and the CSV import, and
- * equal to the Nest CreateProductDto, so every entry point accepts the same products.
- */
 final class ProductRules
 {
     private const SKU_PATTERN = '/^[A-Z0-9][A-Z0-9_-]*$/';

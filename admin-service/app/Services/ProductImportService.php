@@ -14,12 +14,6 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
-/**
- * Runs CSV product imports: checks and stores the upload, queues it, and on
- * the worker feeds each row to ProductRowImporter while recording progress and
- * a per-row error report. A bad row never stops the import, and the same
- * import is never processed twice (it is claimed atomically).
- */
 class ProductImportService
 {
     public const MAX_ROWS = 2000;
@@ -59,7 +53,6 @@ class ProductImportService
         return $this->imports->recent($limit);
     }
 
-    /** Runs on the queue worker. */
     public function process(int $importId): void
     {
         $import = $this->imports->findWithUser($importId);

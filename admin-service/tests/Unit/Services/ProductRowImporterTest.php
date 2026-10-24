@@ -35,7 +35,7 @@ class ProductRowImporterTest extends UnitTestCase
         return [...['sku' => '', 'name' => '', 'slug' => '', 'description' => '', 'price' => '', 'category_slug' => '', 'is_active' => '', 'stock' => ''], ...$cells];
     }
 
-    /** The "category exists" rule normally asks the database; a unit test answers it itself. */
+    // The "category exists" rule normally asks the database; this unit test answers it itself.
     private function givenCategoriesExist(): void
     {
         $verifier = Mockery::mock(PresenceVerifierInterface::class);

@@ -26,8 +26,10 @@ export class ProductSearchProcessor extends WorkerHost {
 
   @OnWorkerEvent('failed')
   onFailed(job: Job | undefined, error: Error): void {
+    const retried = job ? job.attemptsMade < (job.opts.attempts ?? 1) : false;
+
     this.logger.warn(
-      `Search index sync failed (attempt ${job?.attemptsMade}), it will be retried: ${error.message}`,
+      `Search index sync failed (attempt ${job?.attemptsMade}): ${error.message}; ${retried ? 'it will be retried' : 'the next scheduled sync catches up'}`,
     );
   }
 

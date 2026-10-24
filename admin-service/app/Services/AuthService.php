@@ -13,19 +13,10 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use RedisException;
 
-/**
- * Only admins may use the panel. Customers get exactly the same replies as
- * unknown emails, so the login and reset forms never reveal who has an account.
- *
- * A panel session can also be opened with an access token from the api-gateway
- * (shared session). The session then lives and dies with that token: a logout
- * in either service, or the token expiring, ends both.
- */
 class AuthService
 {
     private const MAX_LOGIN_ATTEMPTS = 5;
 
-    /** The claims (never the token itself) of the token a panel session was opened with. */
     private const TOKEN_SESSION_KEY = 'auth.access_token';
 
     public function __construct(
@@ -79,7 +70,6 @@ class AuthService
         Log::info('Admin logged in with an api-gateway token', ['user_id' => $user->id, 'jti' => $claims->jti, 'ip' => $ip]);
     }
 
-    /** Signs out a panel session whose token was logged out, revoked or has expired. True when it did. */
     public function endSessionIfTokenEnded(): bool
     {
         $claims = Session::get(self::TOKEN_SESSION_KEY);
@@ -94,7 +84,6 @@ class AuthService
         return true;
     }
 
-    /** A session opened with a token also revokes that token, so the logout counts in the api-gateway too. */
     public function logout(): void
     {
         $userId = Auth::guard('web')->id();
@@ -114,7 +103,6 @@ class AuthService
         Log::info('Admin logged out', ['user_id' => $userId]);
     }
 
-    /** The outcome is logged (never shown to the user, so the form can't reveal which emails exist). */
     public function sendResetLink(string $email): void
     {
         $status = Password::sendResetLink(['email' => $email, 'role' => UserRole::Admin->value]);

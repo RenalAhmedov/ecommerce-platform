@@ -11,11 +11,6 @@ const CODES: Partial<Record<HttpStatus, string>> = {
   [HttpStatus.SERVICE_UNAVAILABLE]: 'SERVICE_UNAVAILABLE',
 };
 
-/**
- * The same errors as REST, in GraphQL's shape: a readable message, a stable
- * extensions.code clients can switch on, the HTTP status, and every
- * validation message in extensions.details.
- */
 export function httpToGraphqlError(exception: HttpException): GraphQLError {
   const status = exception.getStatus();
   const response = exception.getResponse();

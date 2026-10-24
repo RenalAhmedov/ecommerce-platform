@@ -12,16 +12,6 @@ use Testcontainers\ContainerClient\DockerContainerClient;
 use Testcontainers\Modules\PostgresContainer;
 use Testcontainers\Modules\RedisContainer;
 
-/**
- * Throwaway Postgres and Redis for the integration tests (Testcontainers),
- * the same images as docker-compose.yml and the Nest integration tests.
- * Started once per test run, only when the first integration test needs
- * them, and removed when the run ends; unit tests never start them.
- *
- * Containers are reached through the Docker host: "localhost" when PHP runs
- * on the machine itself (CI), TESTCONTAINERS_HOST_OVERRIDE when it runs in a
- * container (the admin-tests compose service sets host.docker.internal).
- */
 final class TestServices
 {
     private const DATABASE = 'ecommerce_test';
@@ -30,7 +20,6 @@ final class TestServices
 
     private const PASSWORD = 'secret';
 
-    /** Lets a crashed run's leftovers be found: docker ps -a --filter label=ecommerce-platform.tests=admin-service */
     private const LABEL = ['ecommerce-platform.tests' => 'admin-service'];
 
     /** @var list<StartedGenericContainer> */
@@ -80,11 +69,7 @@ final class TestServices
         self::setEnvironment(self::$environment);
     }
 
-    /**
-     * Last line of defence before RefreshDatabase drops and rebuilds every
-     * table: aborts the run unless Laravel really points at the throwaway
-     * containers, so a test can never touch the development database.
-     */
+    // Last line of defence: aborts unless Laravel points at the throwaway containers, so a test run can never wipe the dev database.
     public static function assertIsTarget(Repository $config): void
     {
         $connection = $config->get('database.connections.'.$config->get('database.default'));
@@ -112,24 +97,14 @@ final class TestServices
         self::$containers = [];
     }
 
-    /**
-     * testcontainers-php hands docker-php its own HTTP client, which makes
-     * docker-php add its fixed /v1.45 path on top of the negotiated version
-     * (requests become /v1.41/v1.45/info and fail with 404). A client built
-     * by docker-php's own factory negotiates the API version with the engine
-     * (as the docker CLI does), so old and new Docker engines both work.
-     */
+    // testcontainers-php's own HTTP client makes docker-php double the API version in paths (/v1.41/v1.45/...).
     private static function useNegotiatingDockerClient(): void
     {
         DockerContainerClient::setDockerClient(Docker::create(DockerClientFactory::createFromEnv(), applyServerPlugins: false));
     }
 
-    /**
-     * Set before Laravel boots, and in all three places Laravel's env() reads,
-     * so they win over .env (which never overwrites existing values).
-     *
-     * @param  array<string, string>  $variables
-     */
+    // All three places env() reads, set before Laravel boots, so they win over .env.
+    /** @param  array<string, string>  $variables */
     private static function setEnvironment(array $variables): void
     {
         foreach ($variables as $name => $value) {

@@ -4,22 +4,14 @@ namespace App\Repositories;
 
 use Illuminate\Support\Facades\Redis;
 
-/**
- * The access-token denylist shared with the Nest api-gateway (keys without a
- * prefix, so both services read and write the same ones):
- *  - auth:revoked-token:<jti> kills one token (a logout), until it expires anyway;
- *  - auth:user-tokens-valid-after:<userId> = unix time kills every token of that
- *    user issued before it (deleted, role changed, password changed).
- *
- * @throws \RedisException from every method when Redis is unreachable
- */
+/** @throws \RedisException from every method when Redis is unreachable */
 class RevokedTokenRepository
 {
     private const TOKEN_KEY_PREFIX = 'auth:revoked-token:';
 
     private const USER_KEY_PREFIX = 'auth:user-tokens-valid-after:';
 
-    /** Longer than any token lives: the api-gateway caps JWT_EXPIRES_IN at a day. */
+    // Outlives any token: the api-gateway caps JWT_EXPIRES_IN at a day.
     private const USER_CUTOFF_TTL_SECONDS = 86_400;
 
     public function isRevoked(string $jti, int $userId, int $issuedAt): bool

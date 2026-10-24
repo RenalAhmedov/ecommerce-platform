@@ -1,7 +1,6 @@
 <?php
 
 return [
-    // The Nest api-gateway: told about catalogue changes through its internal webhook.
     'nest' => [
         // The api-gateway, inside Docker http://api-gateway:3000: its catalogue webhook and,
         // for the shop search preview, its GraphQL API. Empty (as in tests) turns both off.

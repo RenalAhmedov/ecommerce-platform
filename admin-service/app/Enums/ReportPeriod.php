@@ -4,7 +4,6 @@ namespace App\Enums;
 
 use Carbon\CarbonImmutable;
 
-/** Grouping of a sales report. The value is also the Postgres date_trunc() unit. */
 enum ReportPeriod: string
 {
     case Day = 'day';
@@ -20,7 +19,6 @@ enum ReportPeriod: string
         };
     }
 
-    /** Start of the next period: reports use [start, end) ranges. */
     public function endOf(CarbonImmutable $date): CarbonImmutable
     {
         return match ($this) {
@@ -30,7 +28,6 @@ enum ReportPeriod: string
         };
     }
 
-    /** Keeps a report (and its PDF) to a readable size: about a year of days, five years of weeks, ten of months. */
     public function maxPeriods(): int
     {
         return match ($this) {

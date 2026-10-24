@@ -44,7 +44,6 @@ export class JwtAuthGuard implements CanActivate {
     const claims = await this.verify(this.extractBearerToken(request));
 
     if (await this.revokedTokenStore.isRevoked(claims)) {
-      // A revoked token being reused can mean it was stolen.
       this.logger.warn(
         `Revoked access token used: user ${claims.sub}, token ${claims.jti}`,
       );

@@ -40,8 +40,10 @@ export function setupApiDocs(app: INestApplication): void {
   const config = new DocumentBuilder()
     .setTitle('E-commerce API Gateway')
     .setDescription(
-      'Customer-facing REST API: authentication, product catalogue and orders. ' +
-        'Use POST /api/auth/login, then "Authorize" with the returned access token.',
+      'Customer-facing REST API: authentication, the product catalogue (cached in Redis, searched with Elasticsearch) and orders. ' +
+        'Use POST /api/auth/login, then "Authorize" with the returned access token. ' +
+        "The same token works on the admin service's API (/admin/api). " +
+        'A read-only GraphQL API with the same data is at POST /api/graphql (schema: api-gateway/src/graphql/schema.gql).',
     )
     .setVersion('1.0')
     .addBearerAuth()

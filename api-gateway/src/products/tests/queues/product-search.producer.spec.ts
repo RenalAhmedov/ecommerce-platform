@@ -42,4 +42,29 @@ describe('ProductSearchProducer', () => {
 
     expect(queue.add).not.toHaveBeenCalled();
   });
+
+  it('schedules the periodic sync and builds the index at start', async () => {
+    const scheduled = Object.assign(queue, {
+      waitUntilReady: vi.fn().mockResolvedValue(undefined),
+      upsertJobScheduler: vi.fn().mockResolvedValue(undefined),
+    });
+
+    producer.onApplicationBootstrap();
+    await vi.waitFor(() => expect(queue.add).toHaveBeenCalled());
+
+    expect(scheduled.upsertJobScheduler).toHaveBeenCalledWith(
+      'sync-products',
+      { every: 300_000 },
+      expect.objectContaining({ name: 'sync-products' }),
+    );
+  });
+
+  it('schedules nothing when search is not configured', () => {
+    const scheduled = Object.assign(queue, { waitUntilReady: vi.fn() });
+    index.isEnabled.mockReturnValue(false);
+
+    producer.onApplicationBootstrap();
+
+    expect(scheduled.waitUntilReady).not.toHaveBeenCalled();
+  });
 });

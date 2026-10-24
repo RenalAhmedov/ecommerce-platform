@@ -10,11 +10,6 @@ use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\Http;
 
-/**
- * Reads the shop the way customers see it, through the api-gateway's public
- * GraphQL API (only it has the Elasticsearch search). Every failure becomes a
- * NestUnavailableException, so callers handle one thing.
- */
 class NestShopClient
 {
     public function __construct(

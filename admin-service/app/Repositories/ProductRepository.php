@@ -25,9 +25,6 @@ class ProductRepository
     }
 
     /**
-     * Streams the filtered products in chunks of 500, so an export of any size
-     * uses constant memory.
-     *
      * @param  array{search?: ?string, category_id?: int|string|null, status?: ?string}  $filters
      * @return LazyCollection<int, Product>
      */
@@ -46,19 +43,16 @@ class ProductRepository
         return $product->loadMissing(['category', 'inventory']);
     }
 
-    /** Re-reads the row with SELECT … FOR UPDATE; must run inside a transaction. */
     public function lockById(int $id): Product
     {
         return Product::whereKey($id)->lockForUpdate()->firstOrFail();
     }
 
-    /** Like lockById, but also finds trashed products and returns null when the row is gone. */
     public function lockByIdWithTrashed(int $id): ?Product
     {
         return Product::withTrashed()->whereKey($id)->lockForUpdate()->first();
     }
 
-    /** Same advisory lock keys as the Nest api-gateway, so both services wait on each other. */
     public function lockUniqueValues(?string $sku, ?string $slug): void
     {
         $keys = [];
@@ -72,7 +66,7 @@ class ProductRepository
         AdvisoryLock::acquire($keys);
     }
 
-    /** Soft-deleted products count: their SKU stays reserved so a restore never duplicates it. */
+    // Deleted products keep their SKU reserved, so a restore can't create a duplicate.
     public function existsBySku(string $sku, ?int $ignoreId = null): bool
     {
         return $this->existsBy('sku', $sku, $ignoreId);

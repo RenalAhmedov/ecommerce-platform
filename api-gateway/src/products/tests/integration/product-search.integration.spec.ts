@@ -6,7 +6,7 @@ import {
 import type * as TestAppModule from '../../../common/tests/integration/test-app.js';
 import { PRODUCT_SEARCH_INDEX } from '../../search/product-search.constants.js';
 
-/** Only this suite starts Elasticsearch; the others run with search off (Postgres). */
+// Only this suite starts Elasticsearch; the others run with search off.
 describe('Product search (integration)', () => {
   let elasticsearch: StartedElasticsearchContainer;
   let es: Client;
@@ -80,7 +80,6 @@ describe('Product search (integration)', () => {
     return body.data.map((product) => product.name);
   };
 
-  /** A small catalogue, fully indexed. */
   const createCatalogue = async () => {
     await createProduct('Wireless Headphones', 'AUD-HP-01', { price: 129.9 });
     await createProduct('Desk Lamp', 'DEC-LMP-01', { price: 49.9 });
@@ -106,7 +105,6 @@ describe('Product search (integration)', () => {
       : null;
   };
 
-  /** What the admin service's catalogue webhook sends after it changed products. */
   const adminServiceChangedProducts = () =>
     testApp.request('POST', '/internal/webhooks/catalog', {
       body: {

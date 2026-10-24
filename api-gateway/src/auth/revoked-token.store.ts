@@ -9,12 +9,6 @@ import {
 } from './constants/auth.constants.js';
 import type { AccessTokenClaims } from './interfaces/jwt-payload.interface.js';
 
-/**
- * The access-token denylist shared with the admin service. A token is revoked
- * when it was logged out (by jti), or when it was issued before its user's
- * tokens were invalidated (the admin service deleted the user, changed their
- * role or password).
- */
 @Injectable()
 export class RevokedTokenStore {
   private readonly unavailableWarning = new ThrottledWarning(
@@ -46,6 +40,7 @@ export class RevokedTokenStore {
       );
 
       return (
+        // The cutoff is written by the admin service when a user is deleted, demoted or gets a new password.
         revoked !== null || (validAfter !== null && iat < Number(validAfter))
       );
     } catch (error) {

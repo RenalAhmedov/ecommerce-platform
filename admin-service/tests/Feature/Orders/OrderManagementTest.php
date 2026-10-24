@@ -25,7 +25,6 @@ class OrderManagementTest extends FeatureTestCase
         $this->admin = User::factory()->admin()->create();
     }
 
-    /** A paid order for 2 × product A and 3 × product B, with 10 of each left in stock. */
     private function paidOrder(OrderStatus $status = OrderStatus::Paid): array
     {
         $order = Order::factory()->create(['status' => $status]);

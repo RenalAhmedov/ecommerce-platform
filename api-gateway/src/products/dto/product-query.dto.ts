@@ -1,4 +1,5 @@
 import { ArgsType, Field, Float, Int } from '@nestjs/graphql';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   IsEnum,
@@ -20,6 +21,10 @@ import { ProductSortField } from '../enums/product-sort-field.enum.js';
 
 @ArgsType()
 export class ProductQueryDto extends PaginationQueryDto {
+  @ApiPropertyOptional({
+    description:
+      'Typo-tolerant search in name, description and SKU (Elasticsearch; plain substring search on Postgres if it is down).',
+  })
   @Field({ nullable: true })
   @IsOptional()
   @Transform(trim)
@@ -51,11 +56,18 @@ export class ProductQueryDto extends PaginationQueryDto {
   @Min(0)
   maxPrice?: number;
 
+  @ApiPropertyOptional({
+    enum: ProductSortField,
+    default: ProductSortField.CreatedAt,
+    description:
+      '`relevance` puts the best match first (with `search`); without a search term it means newest first.',
+  })
   @Field(() => ProductSortField, { defaultValue: ProductSortField.CreatedAt })
   @IsOptional()
   @IsEnum(ProductSortField)
   sortBy: ProductSortField = ProductSortField.CreatedAt;
 
+  @ApiPropertyOptional({ enum: SortOrder, default: SortOrder.Desc })
   @Field(() => SortOrder, { defaultValue: SortOrder.Desc })
   @IsOptional()
   @Transform(toUpperCase)

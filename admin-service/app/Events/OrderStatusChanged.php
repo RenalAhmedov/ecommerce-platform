@@ -9,7 +9,6 @@ use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 
-/** An admin moved an order to another status; the other admins' pages update their badges. */
 class OrderStatusChanged implements ShouldBroadcast
 {
     use Dispatchable;

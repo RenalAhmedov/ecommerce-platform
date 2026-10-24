@@ -10,9 +10,6 @@ class ProductExportService
     public function __construct(private readonly ProductRepository $products) {}
 
     /**
-     * Writes the filtered products as CSV, row by row, so memory stays flat
-     * however many products there are.
-     *
      * @param  array{search?: ?string, category_id?: int|string|null, status?: ?string}  $filters
      * @param  resource  $output
      */

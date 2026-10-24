@@ -9,14 +9,6 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 
-/**
- * Runs in the admin-events container. The api-gateway publishes order.paid on
- * Redis (its own email sender listens to the same channel); this turns each one
- * into a live notification in the panel. Redis pub/sub keeps no history, so a
- * message sent while this is down is simply missed: the orders page still shows
- * the order, only the toast is lost. If Redis drops, the command exits and
- * Docker restarts it.
- */
 #[Signature('orders:listen')]
 #[Description('Listen for orders paid in the shop and notify the admins live')]
 class ListenForShopOrders extends Command
@@ -30,7 +22,6 @@ class ListenForShopOrders extends Command
         Redis::connection('events')->subscribe([self::CHANNEL], fn (string $message) => $this->onMessage($message, $orders));
     }
 
-    /** The api-gateway sends {"pattern": "order.paid", "data": {"orderId": 1, ...}}. */
     public function onMessage(string $message, OrderService $orders): void
     {
         $orderId = json_decode($message, true)['data']['orderId'] ?? null;

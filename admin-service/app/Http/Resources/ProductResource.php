@@ -6,11 +6,7 @@ use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-/**
- * Same field names as the Nest ProductResponseDto, plus image URLs and deletedAt.
- *
- * @mixin Product
- */
+/** @mixin Product */
 class ProductResource extends JsonResource
 {
     /** @return array<string, mixed> */

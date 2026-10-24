@@ -6,12 +6,6 @@ import { ProductsRepository } from '../products.repository.js';
 import type { ProductSearchFilters } from './product-search.query.js';
 import { ProductSearchRepository } from './product-search.repository.js';
 
-/**
- * Searches with Elasticsearch, which finds and orders the matches, and reads
- * the products themselves from Postgres, so prices and stock are never stale.
- * When Elasticsearch is off, down or still building its index, the search
- * runs on Postgres instead: plainer results, but the shop keeps working.
- */
 @Injectable()
 export class ProductSearchService {
   private readonly unavailableWarning = new ThrottledWarning(

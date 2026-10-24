@@ -16,7 +16,7 @@ use Tests\Unit\UnitTestCase;
 
 class JwtAuthServiceTest extends UnitTestCase
 {
-    /** 64 bytes, so a token signed with the same secret but HS512 can be built for the algorithm test. */
+    // 64 bytes, so the same secret can also sign an HS512 token for the algorithm test.
     private const SECRET = 'unit-test-secret-unit-test-secret-unit-test-secret-unit-test-1234';
 
     private UserRepository&MockInterface $users;
@@ -40,7 +40,6 @@ class JwtAuthServiceTest extends UnitTestCase
         return app(JwtAuthService::class);
     }
 
-    /** Signed exactly like the Nest api-gateway does. */
     private function token(array $overrides = [], string $secret = self::SECRET, string $algorithm = 'HS256'): string
     {
         $claims = ['sub' => 7, 'email' => 'ada@example.test', 'role' => 'admin', 'jti' => 'jti-1', 'iat' => $this->issuedAt, 'exp' => $this->issuedAt + 3600, ...$overrides];

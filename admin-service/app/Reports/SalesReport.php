@@ -5,7 +5,6 @@ namespace App\Reports;
 use App\Enums\ReportPeriod;
 use Carbon\CarbonImmutable;
 
-/** A finished sales report: what the page, the CSV, the PDF and the API all render. */
 final readonly class SalesReport
 {
     /**
@@ -21,7 +20,6 @@ final readonly class SalesReport
         public CarbonImmutable $generatedAt,
     ) {}
 
-    /** The last day covered (the range itself is [from, to)). */
     public function lastDay(): CarbonImmutable
     {
         return $this->to->subDay();

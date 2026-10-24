@@ -149,7 +149,7 @@ flowchart LR
 Only Docker is needed:
 
 ```bash
-docker compose run --rm api-tests      # Nest: 286 unit + 42 integration tests
+docker compose run --rm api-tests      # Nest: 290 unit + 42 integration tests
 docker compose run --rm admin-tests    # Laravel: 282 unit + integration tests
 ```
 

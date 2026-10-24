@@ -6,7 +6,6 @@ use App\Models\User;
 use Tests\Feature\Api\Concerns\AuthenticatesWithNestToken;
 use Tests\Feature\FeatureTestCase;
 
-/** User management over the JSON API. */
 class UserApiTest extends FeatureTestCase
 {
     use AuthenticatesWithNestToken;

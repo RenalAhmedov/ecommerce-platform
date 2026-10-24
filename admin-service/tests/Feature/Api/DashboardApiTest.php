@@ -5,7 +5,6 @@ namespace Tests\Feature\Api;
 use Tests\Feature\Api\Concerns\AuthenticatesWithNestToken;
 use Tests\Feature\FeatureTestCase;
 
-/** Dashboard figures over the JSON API. */
 class DashboardApiTest extends FeatureTestCase
 {
     use AuthenticatesWithNestToken;

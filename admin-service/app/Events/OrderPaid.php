@@ -7,7 +7,6 @@ use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 
-/** A customer paid an order in the shop (announced by the api-gateway). Queued: the worker sends it to Reverb. */
 class OrderPaid implements ShouldBroadcast
 {
     use Dispatchable;
