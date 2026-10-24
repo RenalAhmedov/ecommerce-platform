@@ -24,7 +24,7 @@ COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-interaction --no-progress --no-scripts --no-autoloader --prefer-dist
 
 # Tailwind also scans Laravel's pagination views in vendor/, so the build gets the PHP packages too.
-FROM node:24-alpine AS assets
+FROM node:25-alpine AS assets
 WORKDIR /app
 COPY package.json package-lock.json .npmrc ./
 RUN npm ci --no-audit --no-fund
