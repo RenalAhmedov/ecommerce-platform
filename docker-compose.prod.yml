@@ -117,6 +117,19 @@ services:
       redis:
         condition: service_healthy
 
+  reverb:
+    <<: *admin-service
+    restart: unless-stopped
+    command: ["php", "artisan", "reverb:start", "--host=0.0.0.0", "--port=8080"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:8080/up"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    depends_on:
+      admin-migrate:
+        condition: service_completed_successfully
+
   # queue:work keeps the booted app in memory (fast); --max-time restarts it hourly
   # so memory never creeps up, and `restart` brings it straight back.
   admin-worker:
@@ -147,6 +160,8 @@ services:
       api-gateway:
         condition: service_healthy
       admin-service:
+        condition: service_healthy
+      reverb:
         condition: service_healthy
 
 volumes:

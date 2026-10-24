@@ -212,6 +212,12 @@ Uploading an image (edit page, or `POST /admin/api/products/{id}/image` as multi
 
 Only the newest upload of a product is ever applied (two quick uploads can't end with the older picture), removing an image also cancels an upload still in the queue, and a file that can't be decoded fails the job at once instead of retrying. Uploads are limited to JPEG/PNG/WebP, 5 MB and 8000 px per side.
 
+## Live updates (Reverb + Echo)
+
+The panel receives events over WebSockets: [Laravel Reverb](https://reverb.laravel.com) runs as the `reverb` container, and Echo in the browser connects to it through Nginx (`/app`, the same address as the page, so no extra port). Reverb's publishing API (`/apps`) is not exposed; this app reaches it directly on the Docker network (`REVERB_HOST=reverb`).
+
+Events go to one private channel, `admin.orders`. Before joining, Echo asks `POST /broadcasting/auth`, which only answers for logged-in admins (`routes/channels.php`), signed with `REVERB_APP_SECRET`. The key is public (the layout puts it in a `<meta>` tag); the secret never leaves the server. In tests broadcasting is off (`BROADCAST_CONNECTION=null`).
+
 ## Redis and the queue worker
 
 Sessions, cache and queues use the shared Redis. Every Laravel key starts with `admin:` (`REDIS_PREFIX`), so it never collides with the Nest service's keys (`bull:*`, `idempotency:*`, `products:*`, `auth:*`).

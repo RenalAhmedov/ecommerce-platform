@@ -47,7 +47,7 @@ COPY --from=assets /app/public/build ./public/build
 
 RUN composer dump-autoload --no-dev --optimize --no-interaction \
     && php artisan storage:link \
-    && chown -R www-data:www-data storage bootstrap/cache /data/caddy /config/caddy
+    && chown -R www-data:www-data storage bootstrap/cache /data/caddy /config
 
 USER www-data
 
