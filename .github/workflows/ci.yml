@@ -99,7 +99,9 @@ jobs:
         run: npm ci --no-audit --no-fund && npm run build
 
   publish:
-    name: Publish ${{ matrix.service }} image
+    # Without the matrix in the name, GitHub appends it when the jobs run ("Publish image (api-gateway)")
+    # and a skipped run reads "Publish image" instead of a raw ${{ }} placeholder.
+    name: Publish image
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [infrastructure, api-gateway, admin-service]
     runs-on: ubuntu-24.04
