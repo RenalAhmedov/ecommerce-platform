@@ -1,7 +1,7 @@
 #!/bin/sh
 # First start of a fresh clone, with only Docker installed: creates the .env
-# files with freshly generated secrets that match across the services, builds
-# the admin panel's CSS/JS, starts the whole platform and loads the demo data.
+# files with freshly generated secrets that match across the services, starts
+# the whole platform, builds the admin panel's CSS/JS and loads the demo data.
 # Safe to run again: values already in the .env files and existing data are kept.
 set -eu
 cd "$(dirname "$0")/.."
@@ -43,13 +43,16 @@ fill admin-service/.env APP_KEY "base64:$(head -c 32 /dev/urandom | base64)"
 fill admin-service/.env REVERB_APP_KEY "$(random_hex 10)"
 fill admin-service/.env REVERB_APP_SECRET "$(random_hex 20)"
 
-echo "2/4 Building the admin panel's CSS/JS"
-docker compose run --rm admin-assets
-
-echo "3/4 Starting the platform (the first time downloads images and installs packages: a few minutes)"
+echo "2/4 Starting the platform (the first time downloads images and installs packages: a few minutes)"
+# Returns once Nginx is started, which it is only after the api-gateway, the admin
+# service and Reverb are healthy. --no-deps: that is already true, so the one-off
+# migration tasks aren't started a second time; this only waits for Nginx itself.
 docker compose up -d
-# Nginx becomes healthy only once the api-gateway, the admin service and Reverb are.
-docker compose up -d --wait nginx
+docker compose up -d --wait --no-deps nginx
+
+echo "3/4 Building the admin panel's CSS/JS"
+# After the start: Tailwind needs the PHP packages admin-migrate installed.
+docker compose run --rm admin-assets
 
 echo "4/4 Loading the demo data"
 # Only warnings: the seeders' info logs would flood the terminal (they go to stderr in Docker).

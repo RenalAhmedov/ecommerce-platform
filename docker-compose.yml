@@ -14,9 +14,9 @@ services:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 5s
+      interval: 2s
       timeout: 5s
-      retries: 10
+      retries: 25
 
   redis:
     image: redis:7-alpine
@@ -28,9 +28,9 @@ services:
       - redis-data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
+      interval: 2s
       timeout: 3s
-      retries: 10
+      retries: 25
 
   # Product search. Optional: without it (or while it is down) the api-gateway
   # searches Postgres instead. Security is off because only this Docker network
@@ -69,9 +69,9 @@ services:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     healthcheck:
       test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1/nginx-health"]
-      interval: 10s
+      interval: 3s
       timeout: 3s
-      retries: 3
+      retries: 10
     depends_on:
       api-gateway:
         condition: service_healthy
@@ -124,9 +124,9 @@ services:
       - "127.0.0.1:${API_PORT:-3000}:3000"
     healthcheck:
       test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:3000/api/health"]
-      interval: 10s
+      interval: 3s
       timeout: 3s
-      retries: 3
+      retries: 10
       # Watch mode compiles everything before it listens.
       start_period: 90s
     depends_on:
@@ -144,8 +144,14 @@ services:
       target: dev
     image: ecommerce-platform-admin-service
     command: ["sh", "-c", "composer install --no-interaction --no-progress --quiet && php artisan storage:link --quiet && php artisan migrate --force"]
-    volumes:
+    volumes: &admin-service-volumes
       - ./admin-service:/var/www/html
+      # PHP packages stay in a volume: installing thousands of files into a folder
+      # mounted from macOS/Windows takes minutes, inside a volume seconds.
+      - admin-vendor:/var/www/html/vendor
+    # The base image's check probes a FrankenPHP port this one-off task never opens.
+    healthcheck:
+      disable: true
     depends_on:
       api-migrate:
         condition: service_completed_successfully
@@ -156,8 +162,7 @@ services:
       target: dev
     image: ecommerce-platform-admin-service
     restart: unless-stopped
-    volumes:
-      - ./admin-service:/var/www/html
+    volumes: *admin-service-volumes
     ports:
       - "127.0.0.1:${ADMIN_PORT:-8000}:8000"
     environment:
@@ -165,9 +170,9 @@ services:
     # Replaces the base image's check, which probes a FrankenPHP port only the web server has.
     healthcheck:
       test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:8000/up"]
-      interval: 10s
+      interval: 3s
       timeout: 3s
-      retries: 3
+      retries: 10
     depends_on:
       admin-migrate:
         condition: service_completed_successfully
@@ -181,9 +186,9 @@ services:
     ports: []
     healthcheck:
       test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:8080/up"]
-      interval: 10s
+      interval: 3s
       timeout: 3s
-      retries: 3
+      retries: 10
 
   # Turns the api-gateway's order.paid events (Redis pub/sub) into live notifications in the panel.
   admin-events:
@@ -239,6 +244,7 @@ services:
     command: []
     volumes:
       - ./admin-service:/var/www/html
+      - admin-vendor:/var/www/html/vendor
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       TESTCONTAINERS_HOST_OVERRIDE: host.docker.internal
@@ -248,6 +254,8 @@ services:
   # Builds the panel's CSS/JS into admin-service/public/build (`docker compose run --rm admin-assets`).
   # node_modules lives in its own volume, so it never mixes Linux packages into
   # a node_modules folder installed on the host (macOS/Windows) and vice versa.
+  # Tailwind also scans Laravel's pagination views in vendor/, so run it after
+  # admin-migrate has installed the PHP packages.
   admin-assets:
     image: node:24-alpine
     profiles: ["tools"]
@@ -256,6 +264,7 @@ services:
     volumes:
       - ./admin-service:/app
       - admin-node-modules:/app/node_modules
+      - admin-vendor:/app/vendor:ro
 
 volumes:
   postgres-data:
@@ -263,3 +272,4 @@ volumes:
   elasticsearch-data:
   api-gateway-node-modules:
   admin-node-modules:
+  admin-vendor:

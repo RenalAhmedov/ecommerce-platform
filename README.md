@@ -14,7 +14,7 @@ Everything runs in Docker. Nothing else needs to be installed.
 
 ## Quick start
 
-Requirements: [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or Docker Engine with Compose v2), about 4 GB of memory for Docker, and a POSIX shell (macOS, Linux, or WSL on Windows).
+Requirements: [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or Docker Engine with Compose v2), about 4 GB of memory for Docker (Docker Desktop: Settings → Resources; with less, Elasticsearch gets killed for lack of memory and the start slows down a lot), and a POSIX shell (macOS, Linux, or WSL on Windows).
 
 ```bash
 git clone https://github.com/RenalAhmedov/ecommerce-platform.git
@@ -22,7 +22,7 @@ cd ecommerce-platform
 ./scripts/setup.sh
 ```
 
-[`scripts/setup.sh`](scripts/setup.sh) creates the three `.env` files with freshly generated secrets (the ones both services must share are made to match), builds the panel's CSS/JS, starts the whole platform, waits until it is healthy and loads the demo data. The first run takes a few minutes; running it again changes nothing that already exists.
+[`scripts/setup.sh`](scripts/setup.sh) creates the three `.env` files with freshly generated secrets (the ones both services must share are made to match), starts the whole platform, waits until it is healthy, builds the panel's CSS/JS and loads the demo data. The first run takes a few minutes; running it again changes nothing that already exists.
 
 | What | Where | Login |
 |---|---|---|

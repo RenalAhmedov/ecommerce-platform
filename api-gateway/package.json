@@ -23,10 +23,11 @@
     "test:debug": "vitest --inspect-brk --no-file-parallelism",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "typeorm": "typeorm -d dist/database/data-source.js",
+    "build:migrations": "tsc -p tsconfig.migrations.json",
     "migration:create": "typeorm migration:create",
-    "migration:run": "nest build && npm run typeorm -- migration:run",
-    "migration:revert": "nest build && npm run typeorm -- migration:revert",
-    "migration:show": "nest build && npm run typeorm -- migration:show"
+    "migration:run": "npm run build:migrations && npm run typeorm -- migration:run",
+    "migration:revert": "npm run build:migrations && npm run typeorm -- migration:revert",
+    "migration:show": "npm run build:migrations && npm run typeorm -- migration:show"
   },
   "dependencies": {
     "@apollo/server": "^5.5.1",

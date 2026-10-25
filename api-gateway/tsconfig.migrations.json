@@ -1,0 +1,6 @@
+// Compiles only what the migration commands load (the data source, its config and
+// entities, the migrations): seconds instead of a full `nest build`.
+{
+  "extends": "./tsconfig.build.json",
+  "include": ["src/database/data-source.ts", "src/database/migrations/*.ts"]
+}
