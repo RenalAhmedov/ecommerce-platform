@@ -39,7 +39,6 @@ class CategoryServiceTest extends UnitTestCase
         return $category;
     }
 
-    /** The repository returns active categories sorted by name. */
     private function givenActive(Category ...$categories): void
     {
         $this->categories->shouldReceive('allActive')->andReturn(new Collection($categories));

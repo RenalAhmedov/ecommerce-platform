@@ -10,7 +10,6 @@ class InventoryService
 {
     public function __construct(private readonly InventoryRepository $inventory) {}
 
-    /** Every product gets an inventory row; opening stock is recorded as an "initial" movement. */
     public function initializeStock(int $productId, int $quantity, ?User $user): void
     {
         $this->inventory->create($productId, $quantity);
@@ -25,13 +24,7 @@ class InventoryService
         }
     }
 
-    /**
-     * Puts an order's stock back (same as the Nest InventoryService.release):
-     * one "cancellation" movement per product. Must run inside the caller's
-     * transaction, after the order row has been locked.
-     *
-     * @param  array<int, int>  $quantities  product id => quantity
-     */
+    /** @param  array<int, int>  $quantities  product id => quantity */
     public function release(array $quantities, int $orderId, ?User $user): void
     {
         if ($quantities === []) {

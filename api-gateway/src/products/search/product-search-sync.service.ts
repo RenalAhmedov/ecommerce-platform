@@ -13,13 +13,6 @@ export interface ProductSearchSyncResult {
   removed: number;
 }
 
-/**
- * Brings the search index up to date with Postgres, whichever service changed
- * the products: everything created, changed or deleted since the last sync is
- * written again (active products) or removed (inactive or deleted ones).
- * Writing a product again is harmless, so a sync can be repeated or overlap
- * the previous one; it runs on a queue with one worker, never twice at once.
- */
 @Injectable()
 export class ProductSearchSyncService {
   private readonly logger = new Logger(ProductSearchSyncService.name);
@@ -73,7 +66,6 @@ export class ProductSearchSyncService {
     const products = await this.productsRepository.findIndexableByIds(ids);
     const searchable = products.filter(isSearchable);
     const searchableIds = new Set(searchable.map((product) => product.id));
-    // Inactive, deleted, or gone from the table altogether.
     const removals = ids.filter((id) => !searchableIds.has(id));
 
     await this.productSearchRepository.apply(

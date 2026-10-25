@@ -43,7 +43,6 @@ class RequestLoggingTest extends FeatureTestCase
         $this->assertTrue(Str::isUuid(Context::get('request_id')));
     }
 
-    /** Nginx sits on Docker's private network; a public caller can't fake its address with the header. */
     public function test_the_client_ip_comes_from_nginx_but_only_from_nginx(): void
     {
         Log::spy();

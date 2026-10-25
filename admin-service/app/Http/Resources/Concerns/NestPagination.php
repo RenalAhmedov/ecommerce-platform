@@ -5,7 +5,6 @@ namespace App\Http\Resources\Concerns;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 
-/** Pagination in the Nest api-gateway shape: { data, meta: { page, limit, total, totalPages } }. */
 trait NestPagination
 {
     /**

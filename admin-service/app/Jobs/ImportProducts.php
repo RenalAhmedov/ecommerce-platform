@@ -12,10 +12,9 @@ class ImportProducts implements ShouldQueue
 {
     use Queueable;
 
-    /** Row errors are reported, not retried; anything else marks the import failed. */
     public int $tries = 1;
 
-    /** Must stay below the Redis queue's retry_after (90 s), or a slow import would be handed to a second worker. */
+    // Below the Redis queue's retry_after (90 s), so a slow import is never handed to a second worker.
     public int $timeout = 85;
 
     public function __construct(public readonly int $importId) {}

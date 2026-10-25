@@ -6,11 +6,7 @@ use App\Models\OrderItem;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-/**
- * Same as the Nest OrderItemResponseDto (name and price as they were when ordered).
- *
- * @mixin OrderItem
- */
+/** @mixin OrderItem */
 class OrderItemResource extends JsonResource
 {
     /** @return array<string, mixed> */

@@ -15,11 +15,6 @@ use RedisException;
 use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
 use UnexpectedValueException;
 
-/**
- * Verifies and revokes access tokens issued by the Nest api-gateway (HS256,
- * shared secret, claims { sub, email, role, jti, iat, exp }), so one token
- * works, and dies, in both services.
- */
 class JwtAuthService
 {
     private const ALGORITHM = 'HS256';
@@ -39,7 +34,6 @@ class JwtAuthService
         return $claims === null ? null : $this->users->findById((int) $claims->sub);
     }
 
-    /** The claims of a valid token that neither service has revoked, or null. */
     public function verify(?string $token): ?object
     {
         $claims = $this->claims($token);
@@ -49,7 +43,6 @@ class JwtAuthService
         }
 
         if ($this->isRevoked($claims)) {
-            // A revoked token being reused can mean it was stolen.
             Log::warning('Revoked access token used', ['jti' => $claims->jti, 'sub' => $claims->sub]);
 
             return null;
@@ -58,13 +51,11 @@ class JwtAuthService
         return $claims;
     }
 
-    /** Re-checks claims verified earlier (a panel session opened with the token): not expired and not revoked since. */
     public function isActive(object $claims): bool
     {
         return $claims->exp > time() && ! $this->isRevoked($claims);
     }
 
-    /** Same contract as the api-gateway's logout: the token is refused by both services until it expires. */
     public function logout(string $token): void
     {
         $claims = $this->claims($token) ?? throw new LogicException('logout() needs a token the jwt guard has accepted.');
@@ -86,13 +77,8 @@ class JwtAuthService
         Log::info('Access token revoked by logout', ['jti' => $claims->jti, 'sub' => $claims->sub]);
     }
 
-    /**
-     * Kills every token the user holds in both services. Unlike the check, this
-     * fails closed: a deleted or demoted user must not keep a working token, so
-     * the caller's change is rolled back instead.
-     *
-     * @throws RedisException
-     */
+    // Fails closed (unlike isRevoked): the caller's change rolls back rather than leave a deleted user a working token.
+    /** @throws RedisException */
     public function revokeAllForUser(int $userId): void
     {
         $this->revokedTokens->revokeAllForUser($userId);
@@ -100,7 +86,6 @@ class JwtAuthService
         Log::info('All access tokens of the user revoked', ['target_user_id' => $userId]);
     }
 
-    /** Null for a bad signature, an expired or malformed token, another algorithm, or missing claims. */
     private function claims(?string $token): ?object
     {
         if ($token === null || $token === '') {
@@ -125,7 +110,7 @@ class JwtAuthService
         return $valid ? $claims : null;
     }
 
-    /** Fails open like the Nest guard: Redis being down must not lock every admin out. */
+    // Fails open, like the api-gateway's guard: Redis being down must not lock every admin out.
     private function isRevoked(object $claims): bool
     {
         try {

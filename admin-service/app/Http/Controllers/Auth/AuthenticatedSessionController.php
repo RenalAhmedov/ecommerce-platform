@@ -33,7 +33,6 @@ class AuthenticatedSessionController extends Controller
         return redirect()->intended(route('dashboard', absolute: false));
     }
 
-    /** Opens a panel session with an access token from the api-gateway, so an admin logs in once for both. */
     public function storeWithToken(TokenLoginRequest $request): RedirectResponse
     {
         $this->auth->loginWithToken($request->string('token')->toString(), $request->ip());

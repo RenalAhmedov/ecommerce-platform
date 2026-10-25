@@ -8,14 +8,6 @@ use App\Repositories\SalesRepository;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Cache\Repository as Cache;
 
-/**
- * Dashboard figures, cached in Redis with "stale-while-revalidate": fresh for
- * 30 s; after that the previous figures are still served instantly for up to
- * 5 minutes while a single background refresh recomputes them, so neither a
- * slow page nor a burst of recomputations ("cache stampede") ever happens.
- * Orders are also written by the Nest api-gateway, so a short lifetime is used
- * instead of invalidating on every change. All periods are in the app timezone (UTC).
- */
 class DashboardService
 {
     public const FRESH_SECONDS = 30;
@@ -48,6 +40,7 @@ class DashboardService
      */
     public function metrics(): array
     {
+        // Fresh for 30 s, then served stale for up to 5 min while one background refresh recomputes.
         return $this->cache->flexible(self::CACHE_KEY, [self::FRESH_SECONDS, self::STALE_SECONDS], fn () => $this->compute());
     }
 

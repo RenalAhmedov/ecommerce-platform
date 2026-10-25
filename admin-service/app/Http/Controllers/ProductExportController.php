@@ -10,7 +10,6 @@ class ProductExportController extends Controller
 {
     public function __construct(private readonly ProductExportService $export) {}
 
-    /** Exports what the product list currently shows (same filters). */
     public function __invoke(ProductIndexRequest $request): StreamedResponse
     {
         $filters = $request->validated();

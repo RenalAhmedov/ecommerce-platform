@@ -12,7 +12,7 @@ export class OrderConfirmationService {
     private readonly mailService: MailService,
   ) {}
 
-  /** SMTP errors escape, so the queue retries the job. */
+  // SMTP errors escape, so the queue retries the job.
   async send(orderId: number): Promise<void> {
     const order = await this.ordersRepository.findForConfirmation(orderId);
 

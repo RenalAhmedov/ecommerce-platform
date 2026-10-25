@@ -40,7 +40,7 @@ export class ProductSearchProducer implements OnApplicationBootstrap {
     );
   }
 
-  /** Never fails the caller: a lost request is caught up by the scheduled sync. */
+  // Never fails the caller: a lost request is caught up by the scheduled sync.
   async requestSync(): Promise<void> {
     if (!this.productSearchRepository.isEnabled()) {
       return;
@@ -61,7 +61,6 @@ export class ProductSearchProducer implements OnApplicationBootstrap {
     }
   }
 
-  /** A sync at start (builds the index the first time) and then every few minutes. */
   private async scheduleSyncs(): Promise<void> {
     try {
       await this.queue.waitUntilReady();

@@ -35,17 +35,11 @@ class OrderService
         return $this->orders->loadDetails($order);
     }
 
-    /**
-     * Locks the order row first and the stock rows second, the same order as
-     * the Nest api-gateway, and re-checks the status under the lock, so a
-     * double click, two admins or a Nest job running at the same moment can
-     * never apply a change twice (e.g. return the stock of a cancelled order twice).
-     *
-     * @throws ValidationException when the change is not allowed from the current status
-     */
+    /** @throws ValidationException when the change is not allowed from the current status */
     public function changeStatus(Order $order, OrderStatus $status, User $admin): Order
     {
         $order = DB::transaction(function () use ($order, $status, $admin) {
+            // Order row first, then stock rows (like the api-gateway); the status is re-checked under the lock.
             $order = $this->orders->lockById($order->id);
 
             if (! $order->status->canMoveTo($status)) {
@@ -83,7 +77,6 @@ class OrderService
         return $order;
     }
 
-    /** The api-gateway took a payment: tells every admin with the panel open. */
     public function announcePaid(int $orderId): void
     {
         $order = $this->orders->findWithCustomer($orderId);

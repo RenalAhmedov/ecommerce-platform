@@ -36,7 +36,7 @@ class CategoryRepository
         AdvisoryLock::acquire([AdvisoryLock::categoryTree()]);
     }
 
-    /** Trashed categories count: their slug stays reserved for a restore. */
+    // Deleted categories keep their slug reserved, so a restore can't create a duplicate.
     public function existsBySlug(string $slug, ?int $ignoreId = null): bool
     {
         return Category::withTrashed()
@@ -55,10 +55,6 @@ class CategoryRepository
         return $category->children()->exists();
     }
 
-    /**
-     * True when $candidateId is $categoryId itself or sits anywhere below it,
-     * found by walking up the parent chain from the candidate.
-     */
     public function isSelfOrDescendant(int $candidateId, int $categoryId): bool
     {
         $result = DB::selectOne(

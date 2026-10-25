@@ -6,7 +6,7 @@ import { OrderQueryDto } from './dto/order-query.dto.js';
 import { OrderResponseDto } from './dto/order-response.dto.js';
 import { OrdersReadService } from './services/orders-read.service.js';
 
-/** Reading only: placing orders stays in REST, with its Idempotency-Key handling. */
+// Read-only: orders are placed through REST, which has the Idempotency-Key handling.
 @Resolver(() => OrderResponseDto)
 export class OrdersResolver {
   constructor(private readonly ordersReadService: OrdersReadService) {}

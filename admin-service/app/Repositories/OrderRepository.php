@@ -12,8 +12,6 @@ use Illuminate\Database\Eloquent\Builder;
 class OrderRepository
 {
     /**
-     * Customers who were soft-deleted still show on their orders.
-     *
      * @param  array{search?: ?string, status?: ?string, date_from?: ?string, date_to?: ?string}  $filters
      * @return LengthAwarePaginator<int, Order>
      */
@@ -47,7 +45,6 @@ class OrderRepository
         ]);
     }
 
-    /** Re-reads the row with SELECT … FOR UPDATE, as the Nest api-gateway does before any status change. */
     public function findWithCustomer(int $id): ?Order
     {
         return Order::with(['user' => fn ($query) => $query->withTrashed()])->find($id);

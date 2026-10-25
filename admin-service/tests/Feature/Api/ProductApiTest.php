@@ -12,7 +12,6 @@ use Illuminate\Support\Facades\Storage;
 use Tests\Feature\Api\Concerns\AuthenticatesWithNestToken;
 use Tests\Feature\FeatureTestCase;
 
-/** Products over the JSON API, in the Nest response shape. */
 class ProductApiTest extends FeatureTestCase
 {
     use AuthenticatesWithNestToken;

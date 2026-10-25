@@ -8,10 +8,6 @@ use Intervention\Image\Format;
 use Intervention\Image\ImageManager;
 use Intervention\Image\Interfaces\ImageManagerInterface;
 
-/**
- * Re-encoding to WebP also drops EXIF metadata (camera, GPS location) from uploads.
- * Photos are turned upright first (autoOrientation), since EXIF rotation is lost.
- */
 class ImageResizer
 {
     private const QUALITY = 80;
@@ -23,11 +19,7 @@ class ImageResizer
         $this->manager = ImageManager::usingDriver(Driver::class, autoOrientation: true, strip: true);
     }
 
-    /**
-     * Fits the image inside a $maxSize square, never enlarging it.
-     *
-     * @throws ImageException when the data is not a readable image
-     */
+    /** @throws ImageException when the data is not a readable image */
     public function fitAsWebp(string $binary, int $maxSize): string
     {
         return (string) $this->manager->decodeBinary($binary)
@@ -35,11 +27,7 @@ class ImageResizer
             ->encodeUsingFormat(Format::WEBP, quality: self::QUALITY);
     }
 
-    /**
-     * Crops to a centred $size × $size square.
-     *
-     * @throws ImageException when the data is not a readable image
-     */
+    /** @throws ImageException when the data is not a readable image */
     public function squareAsWebp(string $binary, int $size): string
     {
         return (string) $this->manager->decodeBinary($binary)

@@ -138,7 +138,6 @@ class UserManagementTest extends FeatureTestCase
         $this->assertNotSoftDeleted($this->admin);
     }
 
-    /** Admins A and B demote each other at the same moment: the second request must not leave zero admins. */
     public function test_the_last_admin_cannot_be_removed(): void
     {
         $other = User::factory()->admin()->create();
@@ -169,7 +168,6 @@ class UserManagementTest extends FeatureTestCase
         $this->assertNotSoftDeleted($customer);
     }
 
-    /** The api-gateway reads the same key, so these users lose their tokens there too. */
     public function test_deleting_demoting_or_a_new_password_kills_the_users_access_tokens(): void
     {
         [$deleted, $demoted, $newPassword, $renamed] = [User::factory()->create(), User::factory()->admin()->create(), User::factory()->create(), User::factory()->create()];

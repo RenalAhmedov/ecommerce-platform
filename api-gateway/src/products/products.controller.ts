@@ -37,7 +37,8 @@ export class ProductsController {
   @Get()
   @ApiOperation({
     summary: 'List active products',
-    description: 'Paginated, filterable and sortable. Cached in Redis.',
+    description:
+      'Paginated, filterable and sortable, cached in Redis. With `search`, Elasticsearch finds the matches (typos forgiven, `sortBy=relevance` for best match first) and the products are read from Postgres.',
   })
   @ApiPaginatedResponse(ProductResponseDto)
   @ApiErrorResponses(HttpStatus.BAD_REQUEST)

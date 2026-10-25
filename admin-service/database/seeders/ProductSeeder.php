@@ -11,14 +11,9 @@ use Illuminate\Database\Seeder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
 
-/**
- * Products are created through the same services as the panel, so each gets its
- * stock row and "initial" ledger entry, and a picture that goes through the real
- * upload pipeline (the queue worker resizes it to WebP and makes the thumbnail).
- */
 class ProductSeeder extends Seeder
 {
-    /** sku => [name, category slug, price, initial stock, active] */
+    /** @var array<string, array{string, string, string, int, bool}> sku => [name, category slug, price, initial stock, active] */
     private const PRODUCTS = [
         'AUD-HP-01' => ['Wireless Headphones', 'audio', '129.90', 40, true],
         'AUD-SPK-01' => ['Bluetooth Speaker', 'audio', '59.90', 25, true],
@@ -42,7 +37,7 @@ class ProductSeeder extends Seeder
         'BOK-CLN-01' => ['Clean Architecture', 'books', '34.90', 2, true],
     ];
 
-    /** Picture background per top-level category. */
+    /** @var array<string, array{int, int, int}> top-level category slug => picture background (RGB) */
     private const COLORS = [
         'electronics' => [37, 99, 235],
         'home-kitchen' => [217, 119, 6],

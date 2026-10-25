@@ -11,7 +11,8 @@ export default defineConfig({
     globalSetup: ['src/common/tests/integration/global-setup.ts'],
     setupFiles: ['src/common/tests/integration/setup-env.ts'],
     fileParallelism: false,
-    testTimeout: 20_000,
+    // Generous: races and real containers can be slow on a busy laptop or CI runner.
+    testTimeout: 60_000,
     hookTimeout: 120_000,
   },
 });

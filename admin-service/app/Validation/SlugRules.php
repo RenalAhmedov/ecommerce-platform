@@ -2,7 +2,6 @@
 
 namespace App\Validation;
 
-/** Same pattern as the Nest SLUG_PATTERN: lowercase words joined by single hyphens. */
 final class SlugRules
 {
     /** @return list<string> */

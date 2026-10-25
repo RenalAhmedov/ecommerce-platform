@@ -17,7 +17,7 @@ use Tests\Feature\FeatureTestCase;
 
 class DatabaseSeederTest extends FeatureTestCase
 {
-    /** Picture processing is slow, so only the picture test lets the queued jobs run. */
+    // Picture processing is slow, so only the picture test lets the queued jobs run.
     protected function setUp(): void
     {
         parent::setUp();

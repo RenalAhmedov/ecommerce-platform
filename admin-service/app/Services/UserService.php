@@ -34,13 +34,7 @@ class UserService
         return $this->users->findById($id);
     }
 
-    /**
-     * Same uniqueness rule as the Nest registration (same advisory lock,
-     * case-insensitive, deleted users included), so a shop sign-up and an
-     * admin can never create the same email at the same moment.
-     *
-     * @param  array{name: string, email: string, password: string, role: string}  $data
-     */
+    /** @param  array{name: string, email: string, password: string, role: string}  $data */
     public function create(array $data): User
     {
         return DB::transaction(function () use ($data) {
@@ -55,13 +49,7 @@ class UserService
         });
     }
 
-    /**
-     * An empty password keeps the current one. A new password also renews the
-     * remember token, which signs the user out of "remember me" sessions. A new
-     * password or role kills the user's access tokens in both services.
-     *
-     * @param  array{name?: string, email?: string, password?: ?string, role?: string}  $data
-     */
+    /** @param  array{name?: string, email?: string, password?: ?string, role?: string}  $data */
     public function update(User $user, array $data, User $actor): User
     {
         return DB::transaction(function () use ($user, $data, $actor) {
@@ -103,7 +91,6 @@ class UserService
         });
     }
 
-    /** Orders keep pointing at a deleted user; restoring brings the account back with them. Their access tokens die. */
     public function delete(User $user, User $actor): void
     {
         DB::transaction(function () use ($user, $actor) {
@@ -120,7 +107,6 @@ class UserService
         });
     }
 
-    /** Emails of deleted users stay reserved, so a restore never creates a duplicate. */
     public function restore(User $user): void
     {
         $this->users->restore($user);
@@ -128,7 +114,6 @@ class UserService
         Log::info('User restored', ['target_user_id' => $user->id]);
     }
 
-    /** Signs the user out of "remember me" sessions on other devices and kills their access tokens. */
     public function changePassword(User $user, string $password): void
     {
         $this->replacePassword($user, $password);
@@ -136,7 +121,6 @@ class UserService
         Log::info('Password changed', ['target_user_id' => $user->id]);
     }
 
-    /** Signs the user out of "remember me" sessions on other devices and kills their access tokens. */
     public function resetPassword(User $user, string $password): void
     {
         $this->replacePassword($user, $password);
@@ -161,19 +145,14 @@ class UserService
         }
     }
 
-    /**
-     * Admins can't remove their own access (no locking yourself out) and the
-     * last admin can't be removed. The roster lock makes "count admins, then
-     * remove one" atomic, so two admins demoting each other can't leave none.
-     *
-     * @throws ValidationException
-     */
+    /** @throws ValidationException */
     private function ensureAdminCanBeRemoved(User $admin, User $actor, string $field, string $action): void
     {
         if ($admin->is($actor)) {
             throw ValidationException::withMessages([$field => "You cannot {$action} your own admin account."]);
         }
 
+        // Makes "count the admins, then remove one" atomic, so two admins can't remove each other.
         $this->users->lockAdminRoster();
 
         if ($this->users->countAdmins() <= 1) {

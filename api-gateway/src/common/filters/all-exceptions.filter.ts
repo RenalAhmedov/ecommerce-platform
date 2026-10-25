@@ -20,8 +20,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
   constructor(private readonly httpAdapterHost: HttpAdapterHost) {}
 
-  /** HTTP: writes the JSON error. GraphQL: returns the error, which Apollo puts in "errors". */
   catch(exception: unknown, host: ArgumentsHost): unknown {
+    // GraphQL expects the error returned (Apollo puts it in "errors"), not a written response.
     if (host.getType<GqlContextType>() === 'graphql') {
       return this.toGraphqlError(exception);
     }

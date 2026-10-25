@@ -6,15 +6,9 @@ import { REDIS_CLIENT } from '../cache/constants/cache.constants.js';
 import { ELASTICSEARCH_CLIENT } from '../elasticsearch/elasticsearch.constants.js';
 import type {
   DependencyStatus,
-  HealthReport,
-} from './interfaces/health-report.interface.js';
+  HealthReportDto,
+} from './dto/health-report.dto.js';
 
-/**
- * The database is required: without it the instance is unhealthy and should
- * get no traffic. Redis and Elasticsearch are not: every feature using them
- * degrades gracefully (search falls back to Postgres), so an outage is
- * reported but the instance stays healthy.
- */
 @Injectable()
 export class HealthService {
   constructor(
@@ -23,12 +17,13 @@ export class HealthService {
     @Inject(ELASTICSEARCH_CLIENT) private readonly elasticsearch: Client | null,
   ) {}
 
-  async check(): Promise<HealthReport> {
+  async check(): Promise<HealthReportDto> {
     const [database, redis, elasticsearch] = await Promise.all([
       this.checkDatabase(),
       this.checkRedis(),
       this.checkElasticsearch(),
     ]);
+    // Only the database is required: every feature survives Redis or Elasticsearch being down.
     const degraded = redis === 'down' || elasticsearch === 'down';
 
     return {

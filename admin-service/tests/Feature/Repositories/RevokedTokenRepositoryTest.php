@@ -7,14 +7,13 @@ use Illuminate\Support\Str;
 use Redis;
 use Tests\Feature\FeatureTestCase;
 
-/** Uses the real Redis through a plain client: the keys must be exactly the ones the Nest api-gateway reads and writes. */
 class RevokedTokenRepositoryTest extends FeatureTestCase
 {
     private Redis $nest;
 
     private RevokedTokenRepository $repository;
 
-    /** Never a real user id, so no other test's keys can interfere. */
+    // Never a real user id, so no other test's keys can interfere.
     private int $userId;
 
     protected function setUp(): void

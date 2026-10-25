@@ -33,7 +33,6 @@ class ProductService
         return $this->products->loadDetails($product);
     }
 
-    /** Includes deleted products: their SKU stays reserved. */
     public function findBySkuWithTrashed(string $sku): ?Product
     {
         return $this->products->findBySkuWithTrashed($sku);

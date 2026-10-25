@@ -15,16 +15,11 @@ import {
   type ProductSearchFilters,
 } from './product-search.query.js';
 
-export interface ProductSearchHits {
+interface ProductSearchHits {
   ids: number[];
   total: number;
 }
 
-/**
- * The only class that talks to Elasticsearch. The time up to which the index
- * is in sync is kept in the index's own metadata, so a new or recreated index
- * starts empty and is filled completely by the next sync.
- */
 @Injectable()
 export class ProductSearchRepository {
   constructor(
@@ -35,7 +30,6 @@ export class ProductSearchRepository {
     return this.client !== null;
   }
 
-  /** Ids of the matching products in the requested order, and how many match in total. */
   async search(filters: ProductSearchFilters): Promise<ProductSearchHits> {
     const response = await this.es().search(buildProductSearchRequest(filters));
     const { total } = response.hits;
@@ -46,7 +40,6 @@ export class ProductSearchRepository {
     };
   }
 
-  /** @returns true when the index had to be created (older versions of it are then removed). */
   async ensureIndex(): Promise<boolean> {
     if (await this.es().indices.exists({ index: PRODUCT_SEARCH_INDEX })) {
       return false;
@@ -86,7 +79,6 @@ export class ProductSearchRepository {
     });
   }
 
-  /** Writes (or overwrites) and removes in one bulk request; repeating it changes nothing. */
   async apply(
     upserts: ProductSearchDocument[],
     removals: number[],
@@ -120,7 +112,7 @@ export class ProductSearchRepository {
     }
   }
 
-  /** Deleted by name: Elasticsearch refuses wildcard deletes. */
+  // By name: Elasticsearch refuses wildcard deletes.
   private async deleteOutdatedIndices(): Promise<void> {
     const indices = await this.es().indices.get({
       index: PRODUCT_SEARCH_INDEX_PATTERN,

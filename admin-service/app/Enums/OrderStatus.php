@@ -12,14 +12,8 @@ enum OrderStatus: string
     case Cancelled = 'cancelled';
     case PaymentFailed = 'payment_failed';
 
-    /**
-     * Statuses an admin may move an order to. Pending orders are left to the
-     * Nest api-gateway: it is charging them, and cancelling one mid-payment
-     * would leave a paid customer with a cancelled order (its expiry job
-     * resolves stuck ones after 15 minutes). Final statuses have no next step.
-     *
-     * @return list<self>
-     */
+    // Pending orders are still being charged by the api-gateway; its expiry job resolves stuck ones.
+    /** @return list<self> */
     public function adminTransitions(): array
     {
         return match ($this) {
@@ -30,12 +24,7 @@ enum OrderStatus: string
         };
     }
 
-    /**
-     * Orders whose money the shop keeps: paid and not cancelled. Used by the
-     * dashboard and the sales reports.
-     *
-     * @return list<self>
-     */
+    /** @return list<self> */
     public static function revenueStatuses(): array
     {
         return [self::Paid, self::Processing, self::Shipped, self::Delivered];
@@ -46,7 +35,6 @@ enum OrderStatus: string
         return in_array($status, $this->adminTransitions(), true);
     }
 
-    /** Tailwind classes of the status badge; also sent with live updates, so the browser can recolour it. */
     public function badgeClasses(): string
     {
         return match ($this) {

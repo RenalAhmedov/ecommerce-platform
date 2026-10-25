@@ -8,7 +8,6 @@ use Illuminate\Validation\Rules\Password;
 
 class UpdatePasswordRequest extends FormRequest
 {
-    /** The profile page reads these errors from their own bag, separate from other forms. */
     protected $errorBag = 'updatePassword';
 
     /** @return array<string, ValidationRule|array<mixed>|string> */

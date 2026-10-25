@@ -41,7 +41,7 @@ class UserServiceTest extends UnitTestCase
         return $user;
     }
 
-    /** The service re-reads the row under a lock; here the "locked" copy is the same object. */
+    // The service re-reads the row under a lock; here the "locked" copy is the same object.
     private function givenLocked(User $user): void
     {
         $this->users->shouldReceive('lockById')->with($user->id)->andReturn($user);

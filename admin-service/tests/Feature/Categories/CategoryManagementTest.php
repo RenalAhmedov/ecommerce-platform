@@ -19,7 +19,6 @@ class CategoryManagementTest extends FeatureTestCase
         $this->admin = User::factory()->admin()->create();
     }
 
-    /** Electronics > Computers > Laptops, plus a separate Books root. */
     private function tree(): array
     {
         $electronics = Category::factory()->create(['name' => 'Electronics']);

@@ -8,7 +8,6 @@ use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-/** Without parameters: a daily report of the last 30 days. */
 class SalesReportRequest extends FormRequest
 {
     private const DEFAULT_DAYS = 30;

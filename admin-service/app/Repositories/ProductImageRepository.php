@@ -8,11 +8,6 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
-/**
- * Uploaded originals wait on the private "local" disk until the queue worker
- * has processed them; finished images go to the public disk. A cache entry
- * remembers each product's newest upload so an older job can't overwrite it.
- */
 class ProductImageRepository
 {
     private const UPLOAD_DISK = 'local';

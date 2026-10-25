@@ -30,19 +30,16 @@ class UserRepository
             ->withQueryString();
     }
 
-    /** Soft-deleted users are not found, so their tokens stop working. */
     public function findById(int $id): ?User
     {
         return User::find($id);
     }
 
-    /** Re-reads the row with SELECT … FOR UPDATE; must run inside a transaction. */
     public function lockById(int $id): User
     {
         return User::whereKey($id)->lockForUpdate()->firstOrFail();
     }
 
-    /** Same key as the Nest registration, so a sign-up and an admin can't create the same email at once. */
     public function lockEmail(string $email): void
     {
         AdvisoryLock::acquire([AdvisoryLock::userEmail($email)]);
@@ -53,7 +50,7 @@ class UserRepository
         AdvisoryLock::acquire([AdvisoryLock::adminRoster()]);
     }
 
-    /** Case-insensitive and including deleted users, exactly like the Nest check. */
+    // Case-insensitive and including deleted users, exactly like the api-gateway's check.
     public function existsByEmail(string $email, ?int $ignoreId = null): bool
     {
         return User::withTrashed()

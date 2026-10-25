@@ -1,4 +1,3 @@
-// Live order activity for admins (private channel "admin.orders", see routes/channels.php).
 const container = document.getElementById('toasts');
 const currentUserId = Number(document.querySelector('meta[name="user-id"]')?.content);
 

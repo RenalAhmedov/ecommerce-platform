@@ -7,13 +7,13 @@ use App\Models\User;
 use App\Services\UserService;
 use Illuminate\Database\Seeder;
 
-/** One admin and eight customers; every demo account uses the same password. */
 class UserSeeder extends Seeder
 {
     public const PASSWORD = 'password123';
 
     public const ADMIN_EMAIL = 'admin@example.com';
 
+    /** @var list<array{string, string, UserRole}> name, email, role */
     private const USERS = [
         ['Shop Admin', self::ADMIN_EMAIL, UserRole::Admin],
         ['Ada Lovelace', 'ada.lovelace@example.com', UserRole::Customer],

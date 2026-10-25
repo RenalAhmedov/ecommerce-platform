@@ -6,17 +6,19 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { ApiOperation, ApiSecurity, ApiTags } from '@nestjs/swagger';
+import {
+  ApiAcceptedResponse,
+  ApiOperation,
+  ApiSecurity,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Public } from '../auth/decorators/public.decorator.js';
 import { ApiErrorResponses } from '../common/swagger/api-error-responses.decorator.js';
 import { CatalogWebhookDto } from './dto/catalog-webhook.dto.js';
+import { CatalogWebhookResultDto } from './dto/catalog-webhook-result.dto.js';
 import { ApiKeyGuard } from './guards/api-key.guard.js';
-import {
-  CatalogSyncService,
-  type CatalogSyncResult,
-} from './services/catalog-sync.service.js';
+import { CatalogSyncService } from './services/catalog-sync.service.js';
 
-/** Called by other services of the platform, not by customers: no JWT, an API key instead. */
 @ApiTags('Internal')
 @ApiSecurity('api-key')
 @Public()
@@ -32,10 +34,11 @@ export class WebhooksController {
     description:
       'Invalidates the cached product responses. Redelivering the same eventId is harmless.',
   })
+  @ApiAcceptedResponse({ type: CatalogWebhookResultDto })
   @ApiErrorResponses(HttpStatus.BAD_REQUEST, HttpStatus.UNAUTHORIZED)
   async catalogChanged(
     @Body() event: CatalogWebhookDto,
-  ): Promise<{ status: CatalogSyncResult }> {
+  ): Promise<CatalogWebhookResultDto> {
     return { status: await this.catalogSyncService.handle(event) };
   }
 }

@@ -10,12 +10,6 @@ import type { Request } from 'express';
 import type { EnvironmentVariables } from '../../config/interfaces/environment-variables.interface.js';
 import { API_KEY_HEADER } from '../constants/webhooks.constants.js';
 
-/**
- * Service-to-service authentication: the caller must send the shared
- * INTERNAL_API_KEY in the X-Api-Key header. Both values are hashed before the
- * constant-time comparison, so neither the key nor its length leaks through
- * response timing.
- */
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
   private readonly expectedDigest: Buffer;
@@ -39,5 +33,6 @@ export class ApiKeyGuard implements CanActivate {
 }
 
 function digest(value: string): Buffer {
+  // Equal-length digests: the constant-time comparison can't leak the key's length.
   return createHash('sha256').update(value).digest();
 }

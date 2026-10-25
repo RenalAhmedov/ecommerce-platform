@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-/** One CSV upload and its result report; owned by the admin service. */
 #[Fillable(['user_id', 'original_name', 'file_path', 'total_rows'])]
 class ProductImport extends Model
 {

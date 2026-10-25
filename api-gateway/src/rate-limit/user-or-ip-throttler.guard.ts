@@ -12,7 +12,6 @@ export class UserOrIpThrottlerGuard extends ThrottlerGuard {
     return Promise.resolve(req.user ? `user:${req.user.sub}` : `ip:${req.ip}`);
   }
 
-  /** GraphQL operations count against the same limits as REST calls. */
   protected override getRequestResponse(context: ExecutionContext) {
     const http = httpContextOf(context);
 

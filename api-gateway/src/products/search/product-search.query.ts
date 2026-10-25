@@ -12,11 +12,6 @@ export function isSearch(
   return Boolean(filters.search);
 }
 
-/**
- * A product matches through any of three routes, and the best total score
- * wins: its exact SKU, all words of its name or description (in any order,
- * typos forgiven), or the start of the words of its name (typing "wireless headph": the last word may be unfinished).
- */
 export function buildProductSearchRequest(
   filters: ProductSearchFilters,
 ): estypes.SearchRequest {

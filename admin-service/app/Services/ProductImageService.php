@@ -25,7 +25,6 @@ class ProductImageService
         private readonly CatalogNotifier $catalog,
     ) {}
 
-    /** Stores the original and queues the processing; the request returns straight away. */
     public function upload(Product $product, UploadedFile $file): void
     {
         $uploadPath = $this->images->storeUpload($file);
@@ -41,13 +40,7 @@ class ProductImageService
         return $this->images->pendingUpload($product->id) !== null;
     }
 
-    /**
-     * Runs on the queue worker. Only the product's newest upload is applied: it
-     * is checked again under the row lock, so two jobs finishing in the wrong
-     * order (several workers) can never put an older picture back.
-     *
-     * @throws ImageException when the upload is not a readable image
-     */
+    /** @throws ImageException when the upload is not a readable image */
     public function process(int $productId, string $uploadPath): void
     {
         $original = $this->images->readUpload($uploadPath);
@@ -95,7 +88,6 @@ class ProductImageService
         $this->catalog->catalogChanged('product image changed');
     }
 
-    /** Also cancels an upload that is still queued, so it can't bring the image back. */
     public function remove(Product $product): Product
     {
         $this->images->clearPending($product->id);
@@ -119,7 +111,6 @@ class ProductImageService
         return $product;
     }
 
-    /** Clean-up for a job that gave up: the upload is dropped and the product keeps its old image. */
     public function discard(int $productId, string $uploadPath): void
     {
         if ($this->isNewestUpload($productId, $uploadPath)) {
@@ -130,6 +121,7 @@ class ProductImageService
         Log::warning('Product image upload discarded after failing', ['product_id' => $productId, 'upload' => $uploadPath]);
     }
 
+    // Jobs can finish out of order: only the newest upload may replace the picture.
     private function isNewestUpload(int $productId, string $uploadPath): bool
     {
         return $this->images->pendingUpload($productId) === $uploadPath;

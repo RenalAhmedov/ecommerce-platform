@@ -1,6 +1,5 @@
 import type { Product } from '../entities/product.entity.js';
 
-/** What the index holds: only what is searched, filtered or sorted on. Prices and stock are always read from Postgres. */
 export interface ProductSearchDocument {
   id: number;
   name: string;
@@ -24,7 +23,6 @@ export type IndexableProduct = Pick<
   | 'deletedAt'
 >;
 
-/** Only active, not deleted products are searchable. */
 export function isSearchable(product: IndexableProduct): boolean {
   return product.isActive && product.deletedAt === null;
 }

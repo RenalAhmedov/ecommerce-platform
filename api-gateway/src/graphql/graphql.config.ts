@@ -6,11 +6,6 @@ import { join } from 'node:path';
 import type { EnvironmentVariables } from '../config/interfaces/environment-variables.interface.js';
 import { DateTimeScalar } from './date-time.scalar.js';
 
-/**
- * Read-only GraphQL at /api/graphql next to the REST API. The resolvers call the
- * same services as the controllers, so caching, access rules and validation are
- * shared. Writes stay in REST, where checkout has its Idempotency-Key handling.
- */
 export function createGraphqlOptions(
   config: ConfigService<EnvironmentVariables, true>,
 ): ApolloDriverConfig {

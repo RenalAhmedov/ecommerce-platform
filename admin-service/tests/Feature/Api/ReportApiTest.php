@@ -5,7 +5,6 @@ namespace Tests\Feature\Api;
 use Tests\Feature\Api\Concerns\AuthenticatesWithNestToken;
 use Tests\Feature\FeatureTestCase;
 
-/** Sales reports over the JSON API. */
 class ReportApiTest extends FeatureTestCase
 {
     use AuthenticatesWithNestToken;

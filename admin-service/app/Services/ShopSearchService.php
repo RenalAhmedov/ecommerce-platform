@@ -7,11 +7,6 @@ use App\Integrations\NestUnavailableException;
 use App\Models\Product;
 use Illuminate\Support\Facades\Log;
 
-/**
- * Shows admins what customers get when they search the shop. The search
- * (Elasticsearch: typos, relevance) lives in the api-gateway, so it is asked
- * through its GraphQL API, for exactly the fields the page shows.
- */
 class ShopSearchService
 {
     private const QUERY = <<<'GRAPHQL'
@@ -23,7 +18,6 @@ class ShopSearchService
         }
         GRAPHQL;
 
-    /** The form's sort choices => the GraphQL enum names. */
     public const SORTS = ['relevance' => 'Relevance', 'price' => 'Price', 'name' => 'Name', 'newest' => 'CreatedAt'];
 
     public function __construct(private readonly NestShopClient $shop) {}
@@ -80,7 +74,6 @@ class ShopSearchService
         ];
     }
 
-    /** "up", or "down"/"disabled" when the shop answered from Postgres (no typo tolerance or relevance). */
     private function searchEngine(): string
     {
         try {

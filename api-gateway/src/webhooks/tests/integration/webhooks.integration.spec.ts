@@ -25,7 +25,7 @@ describe('Catalog webhook (integration)', () => {
     occurredAt: new Date().toISOString(),
   });
 
-  /** null sends no X-Api-Key header at all. */
+  // null sends no X-Api-Key header at all.
   const sendWebhook = (
     body: object,
     apiKey: string | null = process.env.INTERNAL_API_KEY ?? null,

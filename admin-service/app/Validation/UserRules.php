@@ -5,7 +5,6 @@ namespace App\Validation;
 use App\Enums\UserRole;
 use Illuminate\Validation\Rule;
 
-/** Same limits as the Nest RegisterDto, so a user created here can log in to the shop and back. */
 final class UserRules
 {
     /** @return array<string, array<mixed>> */
@@ -20,7 +19,6 @@ final class UserRules
         ];
     }
 
-    /** Nest's normalizeEmail: trimmed and lower-cased, so lookups match in both services. */
     public static function normalizeEmail(mixed $email): mixed
     {
         return is_string($email) ? mb_strtolower(trim($email)) : $email;

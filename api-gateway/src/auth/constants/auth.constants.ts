@@ -5,6 +5,5 @@ export const UNKNOWN_USER_PASSWORD_HASH =
 
 export const REVOKED_TOKEN_KEY_PREFIX = 'auth:revoked-token';
 
-/** Unix time written by the admin service when a user is deleted, changes role or gets a new password. */
 export const USER_TOKENS_VALID_AFTER_KEY_PREFIX =
   'auth:user-tokens-valid-after';

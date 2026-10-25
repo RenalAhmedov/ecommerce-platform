@@ -34,7 +34,7 @@ class AuthServiceTest extends UnitTestCase
         $this->service = app(AuthService::class);
     }
 
-    /** Matches the claims object rebuilt from the session (Mockery compares objects by identity). */
+    // Mockery compares objects by identity, and the service rebuilds the claims from the session.
     private function theSessionClaims(object $claims): bool
     {
         return (array) $claims === self::TOKEN_CLAIMS;

@@ -8,7 +8,6 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Tests\Feature\FeatureTestCase;
 
-/** The panel asks the api-gateway's GraphQL API what customers find (Nest is faked here). */
 class ShopSearchTest extends FeatureTestCase
 {
     private User $admin;

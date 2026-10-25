@@ -8,12 +8,6 @@ use Firebase\JWT\JWT;
 use Illuminate\Support\Str;
 use Mockery\MockInterface;
 
-/**
- * API tests call the admin API with access tokens built exactly like the Nest
- * api-gateway builds them. The token denylist is mocked (no token is revoked
- * unless a test says so); RevokedTokenRepositoryTest covers the real Redis keys.
- * Laravel runs setUpAuthenticatesWithNestToken() before every test.
- */
 trait AuthenticatesWithNestToken
 {
     protected User $admin;
@@ -44,10 +38,7 @@ trait AuthenticatesWithNestToken
         return JWT::encode(array_filter($claims, fn ($value) => $value !== null), $secret ?? config('auth.jwt.secret'), 'HS256');
     }
 
-    /**
-     * Calls the API as the admin, or with the given token. The guard is reset so
-     * every call authenticates again, like a real client's next request would.
-     */
+    // Resets the guard, so every call authenticates again like a real client's next request.
     protected function api(?string $token = null): static
     {
         $this->app['auth']->forgetGuards();

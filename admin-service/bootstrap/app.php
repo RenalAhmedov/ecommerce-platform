@@ -16,7 +16,6 @@ return Application::configure(basePath: dirname(__DIR__))
         // "/api" belongs to the Nest api-gateway once Nginx routes both services.
         apiPrefix: 'admin/api',
     )
-    // POST /broadcasting/auth: Echo asks it before joining a private channel; only admins get in.
     ->withBroadcasting(__DIR__.'/../routes/channels.php', ['middleware' => ['web', 'auth', 'admin']])
     ->withMiddleware(function (Middleware $middleware): void {
         // Nginx (on Docker's private network) is the only way in: believe its

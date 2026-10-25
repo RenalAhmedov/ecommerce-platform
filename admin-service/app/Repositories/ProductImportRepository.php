@@ -37,13 +37,10 @@ class ProductImportRepository
         return ProductImport::with('user')->find($id);
     }
 
-    /**
-     * Atomically moves a queued import to "processing". Only one caller can
-     * win, so a job delivered twice never imports the same file twice.
-     */
     public function claim(int $id): bool
     {
         return ProductImport::whereKey($id)
+            // Only one caller can win, so a redelivered job never imports a file twice.
             ->where('status', ImportStatus::Queued)
             ->update(['status' => ImportStatus::Processing, 'started_at' => now()]) === 1;
     }

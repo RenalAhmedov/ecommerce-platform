@@ -1,3 +1,4 @@
+import { Kind } from 'graphql';
 import { DateTimeScalar } from '../date-time.scalar.js';
 
 describe('DateTimeScalar', () => {
@@ -12,5 +13,20 @@ describe('DateTimeScalar', () => {
 
   it('refuses values that are not dates', () => {
     expect(() => DateTimeScalar.serialize('yesterday')).toThrow(TypeError);
+  });
+
+  it('reads dates sent by clients, as variables or inline', () => {
+    expect(DateTimeScalar.parseValue('2026-10-24T09:54:33Z')).toEqual(
+      new Date('2026-10-24T09:54:33Z'),
+    );
+    expect(
+      DateTimeScalar.parseLiteral({
+        kind: Kind.STRING,
+        value: '2026-10-24T09:54:33Z',
+      }),
+    ).toEqual(new Date('2026-10-24T09:54:33Z'));
+    expect(
+      DateTimeScalar.parseLiteral({ kind: Kind.INT, value: '5' }),
+    ).toBeNull();
   });
 });

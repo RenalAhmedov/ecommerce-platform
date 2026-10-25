@@ -9,13 +9,6 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
-/**
- * Turns one CSV row into a product, matched by SKU: a new SKU creates it (with
- * "stock" as opening stock), a known SKU updates it (stock is left alone; it
- * changes only through stock movements). Rows are validated with the same
- * rules as the forms and saved through ProductService, so they get the same
- * locks and uniqueness checks.
- */
 class ProductRowImporter
 {
     public function __construct(private readonly ProductService $products) {}
@@ -54,9 +47,6 @@ class ProductRowImporter
     }
 
     /**
-     * Empty optional cells mean "not given", except category_slug: an empty
-     * one in a file that has the column removes the category.
-     *
      * @param  array<string, string>  $row
      * @param  array<string, int>  $categoryIds
      * @return array<string, mixed>

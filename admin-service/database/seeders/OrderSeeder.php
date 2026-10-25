@@ -15,16 +15,9 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use LogicException;
 
-/**
- * Orders over the last 30 days in every status the shop produces, so the
- * dashboard, reports and order screens have history to show. Each one is
- * written like the api-gateway's checkout (stock locked and taken, "sale"
- * movements, price snapshots); cancelled and declined orders then give their
- * stock back through the same InventoryService the panel uses.
- */
 class OrderSeeder extends Seeder
 {
-    /** [customer, days ago, hour, status, [sku => quantity]] */
+    /** @var list<array{string, int, int, OrderStatus, array<string, int>}> [customer, days ago, hour, status, [sku => quantity]] */
     private const ORDERS = [
         ['ada.lovelace', 29, 10, OrderStatus::Delivered, ['AUD-HP-01' => 1, 'KIT-MUG-01' => 2]],
         ['grace.hopper', 27, 14, OrderStatus::Delivered, ['LAP-14-01' => 1]],
@@ -52,6 +45,7 @@ class OrderSeeder extends Seeder
         ['donald.knuth', 0, 10, OrderStatus::PaymentFailed, ['BOK-ALG-01' => 1]],
     ];
 
+    /** @var list<array{string, string}> [city, postal code] */
     private const CITIES = [
         ['Berlin', '10115'], ['Hamburg', '20095'], ['Munich', '80331'], ['Cologne', '50667'],
         ['Frankfurt', '60311'], ['Stuttgart', '70173'], ['Leipzig', '04109'], ['Dresden', '01067'],

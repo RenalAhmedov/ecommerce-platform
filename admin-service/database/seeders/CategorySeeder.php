@@ -6,10 +6,9 @@ use App\Models\Category;
 use App\Services\CategoryService;
 use Illuminate\Database\Seeder;
 
-/** A three-level tree; parents are listed before their children. */
 class CategorySeeder extends Seeder
 {
-    /** slug => [name, parent slug] */
+    /** @var array<string, array{string, ?string}> slug => [name, parent slug] */
     private const CATEGORIES = [
         'electronics' => ['Electronics', null],
         'audio' => ['Audio', 'electronics'],
