@@ -144,6 +144,29 @@ flowchart LR
 - **Live updates.** Paid orders (from Nest) and status changes (from other admins) appear in every open panel within a second, through Reverb and Echo.
 - **Traceability.** Nginx gives every request an id that travels into both services' logs and across the webhook and GraphQL calls between them.
 
+## Tech stack
+
+| Technology | Used for | Why |
+|---|---|---|
+| **Nest.js 12** (Node 24) + TypeORM | the shop API | modules, dependency injection, guards and pipes give a clear structure; TypeORM owns the schema through migrations |
+| **Laravel 13** (PHP 8.4) + Breeze | the admin panel | server-rendered pages, auth scaffolding, Form Requests, Resources, queues and Eloquent cover an admin panel with little code |
+| **PostgreSQL 16** | the one shared database | transactions, row locks and advisory locks make stock reservation and uniqueness safe across both services |
+| **Redis 7** | cache, queues, sessions, rate limits, token revocation, pub/sub | one fast in-memory store both services can reach; everything in it can be rebuilt or degrades gracefully |
+| **BullMQ** / Laravel queues | emails, image processing, imports, webhooks, broadcasts | slow or retryable work leaves the request, with retries and backoff |
+| **`@nestjs/microservices`** (Redis transport) | the `order.paid` event | event-driven: the admin side reacts to payments without Nest knowing who listens |
+| **Elasticsearch 9** | product search | typo tolerance, relevance ranking and search-as-you-type that SQL `LIKE` can't do |
+| **GraphQL** (Apollo) | read API next to REST | clients ask for exactly the fields they need in one request |
+| **JWT** (HS256, shared secret) | one login for both services | stateless, so each service verifies tokens itself; a Redis key makes revocation possible |
+| **Laravel Reverb + Echo** | live order notifications | first-party WebSocket server, no external service such as Pusher needed |
+| **Nginx** | single entry point | routes `/api`, `/app` and the panel on one port, adds request ids and real client IPs |
+| **FrankenPHP** | serves Laravel | a modern PHP app server in one container, no separate PHP-FPM + web server |
+| **Intervention Image**, **DomPDF** | product pictures, PDF reports | resizing/format conversion and HTML-to-PDF in PHP |
+| **Tailwind, Alpine.js, Vite** | the panel's frontend | small, no SPA framework needed for an admin panel |
+| **Swagger** (`@nestjs/swagger`) | API documentation | generated from the code, so it can't drift from it |
+| **Vitest**, **PHPUnit**, **Testcontainers** | tests | integration tests run against real PostgreSQL, Redis and Elasticsearch, never mocks of them |
+| **Mailpit** | development emails | catches every email so it can be read in a browser |
+| **Docker Compose**, **GitHub Actions** | running and CI/CD | one command starts everything; every push is tested and `main` publishes images |
+
 ## Testing
 
 Only Docker is needed:
