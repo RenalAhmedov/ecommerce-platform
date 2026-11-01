@@ -1,13 +1,13 @@
-# E-commerce Platform
+# E-commerce PlatformTEST
 
 [![CI/CD](https://github.com/RenalAhmedov/ecommerce-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/RenalAhmedov/ecommerce-platform/actions/workflows/ci.yml)
 
 A hybrid e-commerce backend: a **Nest.js API gateway** for the shop (customers, catalogue, checkout) and a **Laravel admin panel** for the people running it, sharing one PostgreSQL database, one Redis and one login.
 
-| | api-gateway (Nest.js 12, Node 24) | admin-service (Laravel 13, PHP 8.4) |
-|---|---|---|
-| For | customers and shop frontends | admins |
-| Offers | REST API with Swagger, read-only GraphQL, JWT auth | Blade panel, JSON admin API |
+|            | api-gateway (Nest.js 12, Node 24)                                                                                                                                                                                           | admin-service (Laravel 13, PHP 8.4)                                                                                                                                                                               |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| For        | customers and shop frontends                                                                                                                                                                                                | admins                                                                                                                                                                                                            |
+| Offers     | REST API with Swagger, read-only GraphQL, JWT auth                                                                                                                                                                          | Blade panel, JSON admin API                                                                                                                                                                                       |
 | Highlights | product catalogue with Redis cache and Elasticsearch search (typo-tolerant, relevance), checkout with stock reservation, mock payment and idempotency keys, confirmation emails on a queue, rate limiting, token revocation | product CRUD with image processing and CSV import/export, nested categories, order management, dashboard, sales reports (CSV/PDF), user management, live order notifications over WebSockets, shop search preview |
 
 Everything runs in Docker. Nothing else needs to be installed.
@@ -24,13 +24,13 @@ cd ecommerce-platform
 
 [`scripts/setup.sh`](scripts/setup.sh) creates the three `.env` files with freshly generated secrets (the ones both services must share are made to match), starts the whole platform, waits until it is healthy, builds the panel's CSS/JS and loads the demo data. The first run takes a few minutes; running it again changes nothing that already exists.
 
-| What | Where | Login |
-|---|---|---|
-| Admin panel | http://localhost:8080 | `admin@example.com` / `password123` |
-| REST API + Swagger | http://localhost:8080/api/docs | customers: `ada.lovelace@example.com` (and 7 more) / `password123` |
-| GraphQL | `POST http://localhost:8080/api/graphql` | same tokens as REST |
-| Admin JSON API | http://localhost:8080/admin/api | an admin's access token |
-| Emails (Mailpit) | http://localhost:8025 | |
+| What               | Where                                    | Login                                                              |
+| ------------------ | ---------------------------------------- | ------------------------------------------------------------------ |
+| Admin panel        | http://localhost:8080                    | `admin@example.com` / `password123`                                |
+| REST API + Swagger | http://localhost:8080/api/docs           | customers: `ada.lovelace@example.com` (and 7 more) / `password123` |
+| GraphQL            | `POST http://localhost:8080/api/graphql` | same tokens as REST                                                |
+| Admin JSON API     | http://localhost:8080/admin/api          | an admin's access token                                            |
+| Emails (Mailpit)   | http://localhost:8025                    |                                                                    |
 
 The demo data: 1 admin, 8 customers, a category tree, 20 products with pictures and stock (some low, one sold out, one inactive) and 24 orders over the last 30 days in every status.
 
@@ -62,44 +62,44 @@ Interactive documentation: **Swagger** at http://localhost:8080/api/docs (every 
 
 ### REST: shop API (api-gateway), `http://localhost:8080/api`
 
-| Method | Path | Access | Notes |
-|---|---|---|---|
-| POST | `/auth/register` | public, 3/min | creates a customer, returns an access token |
-| POST | `/auth/login` | public, 5/min | returns a JWT (1 h) for customers and admins |
-| POST | `/auth/logout` | logged in | revokes this token in both services |
-| GET | `/auth/me` | logged in | the user behind the token |
-| GET | `/products` | public | active products, cached in Redis; `search` (Elasticsearch: typos, word order, as you type), `categoryId`, `minPrice`, `maxPrice`, `sortBy` (`createdAt`, `price`, `name`, `relevance`), `sortOrder`, `page`, `limit` (≤ 100) |
-| GET | `/products/:id` | public | cached |
-| POST | `/products` | admin | with `initialStock` |
-| PUT | `/products/:id` | admin | partial update |
-| POST | `/orders` | logged in, 10/min | reserves stock, charges the mock gateway (`paymentToken: "tok_declined"` fails), queues the confirmation email; send an `Idempotency-Key` header to make retries safe; `402` declined, `409` out of stock |
-| GET | `/orders` | logged in | your orders, `status` filter, paginated |
-| GET | `/orders/:id` | owner or admin | with items and shipping address |
-| GET | `/health` | public | `ok` / `degraded` (Redis or Elasticsearch down) / `503` (no database) |
-| POST | `/internal/webhooks/catalog` | `X-Api-Key` | called by the admin service after catalogue changes |
+| Method | Path                         | Access            | Notes                                                                                                                                                                                                                        |
+| ------ | ---------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/auth/register`             | public, 3/min     | creates a customer, returns an access token                                                                                                                                                                                  |
+| POST   | `/auth/login`                | public, 5/min     | returns a JWT (1 h) for customers and admins                                                                                                                                                                                 |
+| POST   | `/auth/logout`               | logged in         | revokes this token in both services                                                                                                                                                                                          |
+| GET    | `/auth/me`                   | logged in         | the user behind the token                                                                                                                                                                                                    |
+| GET    | `/products`                  | public            | active products, cached in Redis; `search` (Elasticsearch: typos, word order, as you type), `categoryId`, `minPrice`, `maxPrice`, `sortBy` (`createdAt`, `price`, `name`, `relevance`), `sortOrder`, `page`, `limit` (≤ 100) |
+| GET    | `/products/:id`              | public            | cached                                                                                                                                                                                                                       |
+| POST   | `/products`                  | admin             | with `initialStock`                                                                                                                                                                                                          |
+| PUT    | `/products/:id`              | admin             | partial update                                                                                                                                                                                                               |
+| POST   | `/orders`                    | logged in, 10/min | reserves stock, charges the mock gateway (`paymentToken: "tok_declined"` fails), queues the confirmation email; send an `Idempotency-Key` header to make retries safe; `402` declined, `409` out of stock                    |
+| GET    | `/orders`                    | logged in         | your orders, `status` filter, paginated                                                                                                                                                                                      |
+| GET    | `/orders/:id`                | owner or admin    | with items and shipping address                                                                                                                                                                                              |
+| GET    | `/health`                    | public            | `ok` / `degraded` (Redis or Elasticsearch down) / `503` (no database)                                                                                                                                                        |
+| POST   | `/internal/webhooks/catalog` | `X-Api-Key`       | called by the admin service after catalogue changes                                                                                                                                                                          |
 
 Every other endpoint is limited to 100 requests a minute per user (per IP when logged out), with `X-RateLimit-*` and `Retry-After` headers. Errors always look the same: `{ statusCode, error, message, path, timestamp }`, where `message` lists every validation problem.
 
 ### GraphQL (api-gateway), `POST http://localhost:8080/api/graphql`
 
-Read-only, next to REST and sharing its services, cache, guards, rate limits and errors: `products(…)` and `product(id)` (public, same filters and search as REST), `me`, `myOrders(status, page, limit)` and `order(id)` (with a token). Writes stay in REST, where checkout has its idempotency handling. The admin panel's *Shop search* page is a real client of it.
+Read-only, next to REST and sharing its services, cache, guards, rate limits and errors: `products(…)` and `product(id)` (public, same filters and search as REST), `me`, `myOrders(status, page, limit)` and `order(id)` (with a token). Writes stay in REST, where checkout has its idempotency handling. The admin panel's _Shop search_ page is a real client of it.
 
 ### Admin JSON API (admin-service), `http://localhost:8080/admin/api`
 
 Takes the same access token as the shop API, from an admin (the role is read from the database, not the token); 120 requests a minute. Responses use the shop API's field names and page format.
 
-| Method | Path | Notes |
-|---|---|---|
-| POST | `/auth/logout` | revokes the token in both services |
-| GET | `/dashboard` | revenue, orders, customers, low stock, top sellers, recent orders |
-| GET | `/reports/sales` | `period` (`day`, `week`, `month`), `date_from`, `date_to` |
-| GET, POST, GET, PUT/PATCH, DELETE | `/products`, `/products/{id}` | list with `search`, `category_id`, `status` (`active`, `inactive`, `trashed`); delete is a soft delete |
-| PATCH | `/products/{id}/restore` | |
-| POST, DELETE | `/products/{id}/image` | upload (`202`, processed on the queue) or remove the picture |
-| GET | `/orders`, `/orders/{id}` | filters: `search`, `status`, `date_from`, `date_to` |
-| PATCH | `/orders/{id}/status` | allowed steps only (`paid → processing → shipped → delivered`, cancel before shipping); cancelling returns the stock |
-| GET, POST, GET, PUT/PATCH, DELETE | `/users`, `/users/{id}` | an admin can't remove their own access or the last admin |
-| PATCH | `/users/{id}/restore` | |
+| Method                            | Path                          | Notes                                                                                                                |
+| --------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| POST                              | `/auth/logout`                | revokes the token in both services                                                                                   |
+| GET                               | `/dashboard`                  | revenue, orders, customers, low stock, top sellers, recent orders                                                    |
+| GET                               | `/reports/sales`              | `period` (`day`, `week`, `month`), `date_from`, `date_to`                                                            |
+| GET, POST, GET, PUT/PATCH, DELETE | `/products`, `/products/{id}` | list with `search`, `category_id`, `status` (`active`, `inactive`, `trashed`); delete is a soft delete               |
+| PATCH                             | `/products/{id}/restore`      |                                                                                                                      |
+| POST, DELETE                      | `/products/{id}/image`        | upload (`202`, processed on the queue) or remove the picture                                                         |
+| GET                               | `/orders`, `/orders/{id}`     | filters: `search`, `status`, `date_from`, `date_to`                                                                  |
+| PATCH                             | `/orders/{id}/status`         | allowed steps only (`paid → processing → shipped → delivered`, cancel before shipping); cancelling returns the stock |
+| GET, POST, GET, PUT/PATCH, DELETE | `/users`, `/users/{id}`       | an admin can't remove their own access or the last admin                                                             |
+| PATCH                             | `/users/{id}/restore`         |                                                                                                                      |
 
 The admin panel itself (product CRUD with pictures, CSV import/export, nested categories, orders, reports with CSV/PDF export, users) is described in [admin-service/README.md](admin-service/README.md).
 
@@ -126,15 +126,15 @@ flowchart LR
     reverb -. "live toasts" .-> browser
 ```
 
-| Container | Role |
-|---|---|
-| `nginx` | single entry point: `/api` → Nest, `/app` → Reverb, the rest → Laravel; request ids, real client IPs |
-| `api-gateway`, `api-migrate` | the Nest app; its migrations (it owns the shared schema) run once before anything starts |
-| `admin-service`, `admin-migrate` | the Laravel app served by FrankenPHP; its own few tables |
-| `admin-worker` | Laravel queue: image processing, imports, webhooks, broadcasts |
-| `admin-events` | turns Nest's `order.paid` events into live notifications |
-| `reverb` | WebSocket server for the panel |
-| `postgres`, `redis`, `elasticsearch`, `mailpit` | data, cache/queues/sessions, product search, caught emails |
+| Container                                       | Role                                                                                                 |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `nginx`                                         | single entry point: `/api` → Nest, `/app` → Reverb, the rest → Laravel; request ids, real client IPs |
+| `api-gateway`, `api-migrate`                    | the Nest app; its migrations (it owns the shared schema) run once before anything starts             |
+| `admin-service`, `admin-migrate`                | the Laravel app served by FrankenPHP; its own few tables                                             |
+| `admin-worker`                                  | Laravel queue: image processing, imports, webhooks, broadcasts                                       |
+| `admin-events`                                  | turns Nest's `order.paid` events into live notifications                                             |
+| `reverb`                                        | WebSocket server for the panel                                                                       |
+| `postgres`, `redis`, `elasticsearch`, `mailpit` | data, cache/queues/sessions, product search, caught emails                                           |
 
 ### How the two services work together
 
@@ -146,26 +146,26 @@ flowchart LR
 
 ## Tech stack
 
-| Technology | Used for | Why |
-|---|---|---|
-| **Nest.js 12** (Node 24) + TypeORM | the shop API | modules, dependency injection, guards and pipes give a clear structure; TypeORM owns the schema through migrations |
-| **Laravel 13** (PHP 8.4) + Breeze | the admin panel | server-rendered pages, auth scaffolding, Form Requests, Resources, queues and Eloquent cover an admin panel with little code |
-| **PostgreSQL 16** | the one shared database | transactions, row locks and advisory locks make stock reservation and uniqueness safe across both services |
-| **Redis 7** | cache, queues, sessions, rate limits, token revocation, pub/sub | one fast in-memory store both services can reach; everything in it can be rebuilt or degrades gracefully |
-| **BullMQ** / Laravel queues | emails, image processing, imports, webhooks, broadcasts | slow or retryable work leaves the request, with retries and backoff |
-| **`@nestjs/microservices`** (Redis transport) | the `order.paid` event | event-driven: the admin side reacts to payments without Nest knowing who listens |
-| **Elasticsearch 9** | product search | typo tolerance, relevance ranking and search-as-you-type that SQL `LIKE` can't do |
-| **GraphQL** (Apollo) | read API next to REST | clients ask for exactly the fields they need in one request |
-| **JWT** (HS256, shared secret) | one login for both services | stateless, so each service verifies tokens itself; a Redis key makes revocation possible |
-| **Laravel Reverb + Echo** | live order notifications | first-party WebSocket server, no external service such as Pusher needed |
-| **Nginx** | single entry point | routes `/api`, `/app` and the panel on one port, adds request ids and real client IPs |
-| **FrankenPHP** | serves Laravel | a modern PHP app server in one container, no separate PHP-FPM + web server |
-| **Intervention Image**, **DomPDF** | product pictures, PDF reports | resizing/format conversion and HTML-to-PDF in PHP |
-| **Tailwind, Alpine.js, Vite** | the panel's frontend | small, no SPA framework needed for an admin panel |
-| **Swagger** (`@nestjs/swagger`) | API documentation | generated from the code, so it can't drift from it |
-| **Vitest**, **PHPUnit**, **Testcontainers** | tests | integration tests run against real PostgreSQL, Redis and Elasticsearch, never mocks of them |
-| **Mailpit** | development emails | catches every email so it can be read in a browser |
-| **Docker Compose**, **GitHub Actions** | running and CI/CD | one command starts everything; every push is tested and `main` publishes images |
+| Technology                                    | Used for                                                        | Why                                                                                                                          |
+| --------------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| **Nest.js 12** (Node 24) + TypeORM            | the shop API                                                    | modules, dependency injection, guards and pipes give a clear structure; TypeORM owns the schema through migrations           |
+| **Laravel 13** (PHP 8.4) + Breeze             | the admin panel                                                 | server-rendered pages, auth scaffolding, Form Requests, Resources, queues and Eloquent cover an admin panel with little code |
+| **PostgreSQL 16**                             | the one shared database                                         | transactions, row locks and advisory locks make stock reservation and uniqueness safe across both services                   |
+| **Redis 7**                                   | cache, queues, sessions, rate limits, token revocation, pub/sub | one fast in-memory store both services can reach; everything in it can be rebuilt or degrades gracefully                     |
+| **BullMQ** / Laravel queues                   | emails, image processing, imports, webhooks, broadcasts         | slow or retryable work leaves the request, with retries and backoff                                                          |
+| **`@nestjs/microservices`** (Redis transport) | the `order.paid` event                                          | event-driven: the admin side reacts to payments without Nest knowing who listens                                             |
+| **Elasticsearch 9**                           | product search                                                  | typo tolerance, relevance ranking and search-as-you-type that SQL `LIKE` can't do                                            |
+| **GraphQL** (Apollo)                          | read API next to REST                                           | clients ask for exactly the fields they need in one request                                                                  |
+| **JWT** (HS256, shared secret)                | one login for both services                                     | stateless, so each service verifies tokens itself; a Redis key makes revocation possible                                     |
+| **Laravel Reverb + Echo**                     | live order notifications                                        | first-party WebSocket server, no external service such as Pusher needed                                                      |
+| **Nginx**                                     | single entry point                                              | routes `/api`, `/app` and the panel on one port, adds request ids and real client IPs                                        |
+| **FrankenPHP**                                | serves Laravel                                                  | a modern PHP app server in one container, no separate PHP-FPM + web server                                                   |
+| **Intervention Image**, **DomPDF**            | product pictures, PDF reports                                   | resizing/format conversion and HTML-to-PDF in PHP                                                                            |
+| **Tailwind, Alpine.js, Vite**                 | the panel's frontend                                            | small, no SPA framework needed for an admin panel                                                                            |
+| **Swagger** (`@nestjs/swagger`)               | API documentation                                               | generated from the code, so it can't drift from it                                                                           |
+| **Vitest**, **PHPUnit**, **Testcontainers**   | tests                                                           | integration tests run against real PostgreSQL, Redis and Elasticsearch, never mocks of them                                  |
+| **Mailpit**                                   | development emails                                              | catches every email so it can be read in a browser                                                                           |
+| **Docker Compose**, **GitHub Actions**        | running and CI/CD                                               | one command starts everything; every push is tested and `main` publishes images                                              |
 
 ## Testing
 
