@@ -29,7 +29,11 @@ export function configureApp(app: NestExpressApplication): void {
   app.set('trust proxy', config.get('TRUST_PROXY'));
   app.setGlobalPrefix('api');
   app.enableShutdownHooks();
-  app.use(helmet());
+  app.use(
+    helmet({
+      contentSecurityPolicy: { directives: { upgradeInsecureRequests: null } },
+    }),
+  );
   app.enableCors({
     origin: allowedOrigins.length > 0 ? allowedOrigins : false,
     exposedHeaders: EXPOSED_HEADERS,

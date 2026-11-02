@@ -32,6 +32,9 @@ describe('HTTP security headers and CORS (integration)', () => {
     expect(headers.get('content-security-policy')).toContain(
       "default-src 'self'",
     );
+    expect(headers.get('content-security-policy')).not.toContain(
+      'upgrade-insecure-requests',
+    );
     expect(headers.get('x-powered-by')).toBeNull();
   });
 
